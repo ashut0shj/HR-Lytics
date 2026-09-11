@@ -17,6 +17,24 @@ flowchart TD
 
 ---
 
+## 🛠️ Quick Setup & Environment
+
+1. **Create virtual environment:**
+   ```bash
+   python -m venv venv
+   ```
+
+2. **Activate virtual environment:**
+   - **Windows (PowerShell):** `.\venv\Scripts\Activate.ps1`
+   - **Linux/macOS:** `source venv/bin/activate`
+
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+---
+
 ##  File Placement & Folder Guide
 
 Use this guide to determine where to create and place files within the repository:

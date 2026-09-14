@@ -4,13 +4,22 @@
 HR-Lytics is an end-to-end Data Engineering and Analytics platform developed as part of the **V4C Data Engineering Training Exercise**. It demonstrates data synthesis, OLTP database modeling, OLAP star schema dimensional modeling with Slowly Changing Dimensions (SCD Type 2), Python OOP Data Access Layer, and an interactive Streamlit analytics dashboard.
 An HR analytics web app built with Streamlit and MySQL. It lets you manage employees, projects, and performance reviews through a simple UI, and shows analytics dashboards backed by a star-schema data warehouse.
 An end-to-end HR analytics platform built as part of the **V4C Data Engineering Training Exercise**. It covers the full stack: synthetic data generation, a normalized OLTP database, a star-schema data warehouse with SCD Type 2 history tracking, an ETL pipeline via MySQL stored procedures, and a Streamlit dashboard for both operational data entry and executive-level analytics.
+An enterprise-grade HR analytics platform and data warehouse built with Python, MySQL, and Streamlit. It combines an operational (OLTP) database for managing employees, projects, and performance evaluations with an analytical (OLAP) star schema supporting Slowly Changing Dimensions (SCD Type 2) and SQL window functions.
 
 ---
 
 ## 🏗️ System Architecture & Data Flow
 ## What it does
+## Features & Capabilities
 
 The app has four sections:
+* **Interactive Analytics Dashboard**: Headcount metrics, attrition rates, compensation by role, longitudinal performance trends, and top performers per department.
+* **SCD Type 2 Career Tracking**: Tracks employee transitions (department transfers, title changes) across time while maintaining complete historical integrity.
+* **Operational Workflows**:
+  * **Employee Onboarding**: Register new staff, assign departments, and configure compensation profiles.
+  * **Projects & Staffing**: Create projects and allocate team members with defined responsibilities.
+  * **Performance Reviews**: Record multi-metric employee appraisals (performance, job satisfaction, work-life balance).
+* **Synthetic Data Generator**: Scales source employee records to 100,000+ realistic profiles using Faker for volume testing.
 
 - **Analytics Dashboard** — headcount by department, attrition rate, year-over-year performance trends, top performers per department (using SQL window functions), average salary by job role, and SCD Type 2 department-change history.
 - **Onboard Employee** — add a new employee, assign them to a department, and apply SCD2 department transfers with full history preserved.
@@ -20,6 +29,7 @@ The app has four sections:
 ---
 
 ## Architecture
+## Project Structure
 
 ```mermaid
 flowchart TD
@@ -56,27 +66,36 @@ The app reads analytics from `hr_olap` and writes operational data to `hr_oltp`.
    python -m venv venv
    ```
 ```
+```text
 HR-Lytics/
 ├── app.py                  # Streamlit app entry point
 ├── app.py                        # Streamlit entry point
 ├── requirements.txt
 ├── .env                    # DB credentials (not committed)
 ├── .env.example                  # Copy to .env and fill in your DB credentials
+├── app.py                      # Main Streamlit application
+├── requirements.txt            # Python dependencies
+├── .env.example                # Sample database configuration
 ├── src/
 │   ├── db/
 │   │   ├── db_wrapper.py   # MySQL connection wrapper
 │   │   └── query_loader.py # Loads named queries from .sql files
 │   │   ├── db_wrapper.py         # MySQL connection wrapper (auto-reconnect)
 │   │   └── query_loader.py       # Loads named queries from .sql files
+│   │   ├── db_wrapper.py       # Database connection & transaction handler
+│   │   └── query_loader.py     # SQL query management utility
 │   ├── managers/
 │   │   └── managers.py     # CRUD + analytics logic
 │   │   └── managers.py           # CRUD + analytics logic (one class per entity)
+│   │   └── managers.py         # Business logic & Data Access Layer (DAL)
 │   ├── models/
 │   │   └── models.py       # Employee, Project, Review dataclasses
 │   │   └── models.py             # Employee, Project, Review dataclasses
+│   │   └── models.py           # Data models (Employee, Project, Review)
 │   └── synthesizer/
 │       └── generate_data.py  # Generates 100k+ synthetic HR rows
 │       └── generate_data.py      # Scales IBM CSV to 100k rows, builds SCD2 history
+│       └── generate_data.py    # Synthetic data generation script
 ├── sql/
 │   ├── oltp/               # employees, departments, projects, reviews queries
 │   ├── olap/               # analytics queries (window functions, SCD2)
@@ -94,6 +113,14 @@ HR-Lytics/
 ├── diagrams/                     # Architecture diagrams (Mermaid, .md files)
 ├── dataset/                      # Put the IBM HR CSV here before synthesizing
 └── Planning_docs/                # Internal design docs from the planning phase
+│   ├── 01_oltp_schema.sql      # Operational schema setup (hr_oltp)
+│   ├── 02_olap_schema.sql      # Analytical star schema setup (hr_olap)
+│   ├── 03_etl_procedures.sql   # Warehouse loading & SCD Type 2 procedures
+│   ├── 04_analytics_queries.sql # Window functions and analytical queries
+│   ├── oltp/                   # Parameterized operational queries
+│   └── olap/                   # Parameterized reporting queries
+├── diagrams/                   # Architecture & schema design references
+└── dataset/                    # Raw and generated datasets
 ```
 
 2. **Activate virtual environment:**
@@ -106,25 +133,49 @@ HR-Lytics/
    pip install -r requirements.txt
    ```
 ## Setup
+## Prerequisites
+
+* **Python 3.10+**
+* **MySQL Server 8.0+**
+* **pip / venv**
 
 ---
 **1. Clone and create a virtual environment**
 ### 1. Clone and set up a virtual environment
 
 ##  File Placement & Folder Guide
+## Installation & Setup
+
+### 1. Clone the Repository
+
 ```bash
 git clone <repo-url>
 cd HR-Lytics
+```
+
+### 2. Set Up Virtual Environment
+
+```bash
+# Create virtual environment
 python -m venv venv
 venv\Scripts\activate       # Windows
 # source venv/bin/activate  # Mac/Linux
 source venv/bin/activate        # Windows: venv\Scripts\activate
+
+# Activate virtual environment
+# Linux/macOS:
+source venv/bin/activate
+# Windows:
+venv\Scripts\activate
+
+# Install required packages
 pip install -r requirements.txt
 ```
 
 Use this guide to determine where to create and place files within the repository:
 **2. Set up your `.env` file**
 ### 2. Configure your database connection
+### 3. Configure Database Credentials
 
 ```text
 HR-Lytics/
@@ -149,16 +200,21 @@ HR-Lytics/
 └── tests/                         # Pytest unit & integration test scripts
 Create a `.env` file in the project root:
 Copy `.env.example` to `.env` and fill in your MySQL credentials:
+Create a `.env` file in the root directory by copying the example:
 
 ```bash
 cp .env.example .env
 ```
 
 ```
+Configure the environment variables with your MySQL credentials:
+
+```ini
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_password
 DB_NAME=training
+DB_PASSWORD=your_mysql_password
 DB_NAME=hr_oltp
 DB_PORT=3306
 ```
@@ -170,6 +226,7 @@ DB_PORT=3306
 ## 🚀 Key Modules & Capabilities
 Run the SQL files in MySQL Workbench (or any client) in order:
 ### 3. Create the database schemas
+## Database Initialization
 
 1. **Data Synthesizer (`src/synthesizer/`):** Scalable dataset generator using `pandas` and `Faker` to scale raw IBM HR data to 100,000+ synthetic records with realistic SCD Type 2 employment histories.
 2. **OLTP Schema (`sql/oltp/`):** Normalized database model designed for high-frequency write operations (employee onboarding, reviews, project updates).
@@ -178,17 +235,25 @@ Run the SQL files in MySQL Workbench (or any client) in order:
 5. **Python OOP DAL (`src/managers/` & `src/models/`):** Clean Data Access Layer with Singleton database connection pooling and manager classes.
 6. **Streamlit App (`app/`):** Multi-page dashboard supporting operational data updates and executive analytical visualizations.
 Run these SQL files in order using MySQL Workbench or the CLI:
+Run the following SQL scripts in order using your preferred MySQL client (MySQL CLI or MySQL Workbench):
 
 ```bash
 # From MySQL CLI:
 source sql/01_oltp_schema.sql
 source sql/02_olap_schema.sql
 source sql/03_etl_procedures.sql
+mysql -u root -p < sql/01_oltp_schema.sql
+mysql -u root -p < sql/02_olap_schema.sql
+mysql -u root -p < sql/03_etl_procedures.sql
 ```
 sql/01_oltp_schema.sql
 sql/02_olap_schema.sql
 sql/03_etl_procedures.sql
 ```
+
+* `01_oltp_schema.sql`: Sets up the normalized operational database (`hr_oltp`) and staging tables.
+* `02_olap_schema.sql`: Sets up the star schema data warehouse (`hr_olap`) with dimensions and facts.
+* `03_etl_procedures.sql`: Creates stored procedures for warehouse population and SCD Type 2 handling.
 
 ---
 **4. (Optional) Generate synthetic data**
@@ -197,9 +262,13 @@ sql/03_etl_procedures.sql
 ## 📖 Planning Documentation
 Drop the IBM HR CSV (`WA_Fn-UseC_-HR-Employee-Attrition.csv`) into the `dataset/` folder, then run:
 If you want the warehouse pre-populated with 100k+ realistic employees:
+## Synthetic Data Generation (Optional)
 
 For detailed technical blueprints, refer to [`Planning_docs/`](Planning_docs/):
 1. Drop the IBM HR CSV (`WA_Fn-UseC_-HR-Employee-Attrition.csv`) into `dataset/`
+To scale and populate the warehouse with high-volume synthetic employee data:
+
+1. Ensure the IBM HR attrition dataset (`WA_Fn-UseC_-HR-Employee-Attrition.csv`) is present in the `dataset/` directory.
 2. Run the synthesizer:
 
 ```bash
@@ -217,9 +286,14 @@ python src/synthesizer/generate_data.py
 - 🌿 [08_GIT_AND_DEPLOYMENT.md](Planning_docs/08_GIT_AND_DEPLOYMENT.md) — Version control strategy & Streamlit Cloud deploy
 This generates `dataset/staging_employees.csv` and `dataset/staging_employee_history.csv` — load them into the DB using the ETL procedure.
 This writes `dataset/staging_employees.csv` and `dataset/staging_employee_history.csv`. Load them into `hr_oltp.staging_employees` and `hr_oltp.staging_employee_history`, then run the ETL procedures:
+This generates `dataset/staging_employees.csv` and `dataset/staging_employee_history.csv`.
 
 ---
+3. Load the generated staging data into `hr_oltp`, then run the ETL procedures in MySQL:
+
 ```sql
+USE hr_olap;
+
 CALL sp_load_dim_date('2015-01-01', '2027-12-31');
 CALL sp_load_dim_department();
 CALL sp_load_dim_project();
@@ -230,18 +304,26 @@ CALL sp_load_fact_performance_reviews();
 ## 🛠️ Contribution Guidelines
 ## Run the app
 ### 5. Run the app
+---
 
 We enforce feature branch naming (`F-xx-<name>`) and standardized commit messages (`vY.XX.ZZ-message`). Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for full branch and commit guidelines.
+## Running the Application
+
+Start the Streamlit application:
+
 ```bash
 streamlit run app.py
 ```
 
 Opens at `http://localhost:8501`.
+Once running, access the dashboard in your web browser at:
+`http://localhost:8501`
 
 ---
 
 ## 📜 Code of Conduct
 ## Tech stack
+## Application Usage
 
 Please review our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before contributing to ensure a collaborative environment.
 - Python 3.10+
@@ -257,10 +339,15 @@ Please review our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before contributing t
 | Data processing | pandas, Faker |
 | Charts | Plotly Express |
 | Config | python-dotenv |
+* **Analytics Dashboard**: View real-time organizational KPIs, salary distributions, attrition metrics, and SCD Type 2 historical logs.
+* **Onboard Employee**: Add a new employee into the operational database or update an existing employee's department to trigger an SCD Type 2 audit transition.
+* **Projects & Assignments**: Register new projects and assign employees with defined project roles.
+* **Submit Review**: Record structured performance evaluations and view past review records.
 
 ---
 
 ## Diagrams
+## Tech Stack
 
 Detailed architecture diagrams live in [`diagrams/`](diagrams/):
 
@@ -281,3 +368,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming (`F-xx-<name>`) and com
 ## Code of Conduct
 
 See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+* **Frontend / Dashboard**: Streamlit, Plotly Express
+* **Backend**: Python (OOP Data Access Layer)
+* **Database**: MySQL (`mysql-connector-python`)
+* **Data Manipulation**: Pandas, NumPy
+* **Data Synthesis**: Faker
+* **Configuration**: python-dotenv

@@ -8,5 +8,3 @@ __pycache__/
 *.sqlite
 .DS_Store
 
-dataset/staging_*.csv
-dataset/WA_Fn-UseC_-HR-Employee-Attrition.csv

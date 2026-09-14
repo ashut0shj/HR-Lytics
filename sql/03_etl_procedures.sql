@@ -3,10 +3,20 @@
 -- ETL = "Extract, Transform, Load". These stored procedures move data
 -- OUT of the raw staging tables (loaded by the Python synthesizer) and
 -- INTO the clean OLAP star schema (Dim_* and Fact_* tables).
+-- ETL stored procedures: move data from the staging tables (loaded by the
+-- Python synthesizer) into the clean OLAP star schema.
+-- Run after 02_olap_schema.sql. Both hr_oltp and hr_olap must exist on
+-- the same MySQL server — the procedures cross-reference both schemas.
 --
 -- Run this AFTER 02_olap_schema.sql. Because it reads from hr_oltp and
 -- writes to hr_olap, both databases must exist on the same MySQL server.
 -- =====================================================================
+-- Execution order:
+--   CALL sp_load_dim_date('2015-01-01', '2027-12-31');
+--   CALL sp_load_dim_department();
+--   CALL sp_load_dim_project();
+--   CALL sp_load_dim_employee_scd2();
+--   CALL sp_load_fact_performance_reviews();
 
 USE hr_olap;
 
@@ -17,6 +27,8 @@ DELIMITER $$
 -- Beginner note: a date dimension is usually pre-built once, covering
 -- a wide date range, so every fact row always finds a matching date_key.
 -- ---------------------------------------------------------------------
+-- Inserts one row per calendar day between start_date and end_date.
+-- Safe to call multiple times — INSERT IGNORE skips existing date_keys.
 DROP PROCEDURE IF EXISTS sp_load_dim_date $$
 CREATE PROCEDURE sp_load_dim_date(IN start_date DATE, IN end_date DATE)
 BEGIN
@@ -43,6 +55,7 @@ END $$
 -- sp_load_dim_department
 -- Simple "insert what's missing" load — departments rarely change.
 -- ---------------------------------------------------------------------
+-- Inserts departments from hr_oltp that aren't already in Dim_Department.
 DROP PROCEDURE IF EXISTS sp_load_dim_department $$
 CREATE PROCEDURE sp_load_dim_department()
 BEGIN
@@ -84,10 +97,17 @@ END $$
 --      dimension row and insert a fresh current one (this is what makes
 --      it SCD2 rather than a one-time load — safe to re-run).
 -- ---------------------------------------------------------------------
+-- Implements SCD Type 2 merge in three steps:
+--   1. Load historical (closed) versions from staging_employee_history.
+--   2. Close any existing current Dim_Employee row whose tracked attributes
+--      differ from the incoming staging row (department, role, level, income).
+--   3. Insert the new current row for employees added or just closed in step 2.
+-- All three steps are idempotent — safe to re-run without creating duplicates.
 DROP PROCEDURE IF EXISTS sp_load_dim_employee_scd2 $$
 CREATE PROCEDURE sp_load_dim_employee_scd2()
 BEGIN
     -- Step 1: load historical (closed) versions from staging_employee_history
+    -- Step 1: historical versions
     INSERT INTO Dim_Employee (
         employee_id, first_name, last_name, gender, age,
         department_name, job_role, job_level, monthly_income, attrition,
@@ -107,9 +127,11 @@ BEGIN
 
     -- Step 2: close out any existing "current" row whose attributes
     -- differ from the new incoming current row (re-runnable SCD2 logic)
+    -- Step 2: close stale current rows
     UPDATE Dim_Employee de
     JOIN hr_oltp.staging_employees se ON se.employee_id = de.employee_id
     SET de.end_date = DATE_SUB(se.scd_start_date, INTERVAL 1 DAY),
+    SET de.end_date   = DATE_SUB(se.scd_start_date, INTERVAL 1 DAY),
         de.is_current = 0
     WHERE de.is_current = 1
       AND (
@@ -121,6 +143,7 @@ BEGIN
 
     -- Step 3: insert the new current version for employees who either
     -- (a) never existed in Dim_Employee, or (b) were just closed in step 2
+    -- Step 3: insert new current versions
     INSERT INTO Dim_Employee (
         employee_id, first_name, last_name, gender, age,
         department_name, job_role, job_level, monthly_income, attrition,
@@ -143,6 +166,9 @@ END $$
 -- Loads one fact row per staged employee, linked to whichever
 -- Dim_Employee version (employee_key) is CURRENT for that employee.
 -- ---------------------------------------------------------------------
+-- Loads one fact row per staged employee, joined to the employee_key that
+-- is current at load time. project_key is NULL — project linkage comes from
+-- the assignments table and can be joined at query time if needed.
 DROP PROCEDURE IF EXISTS sp_load_fact_performance_reviews $$
 CREATE PROCEDURE sp_load_fact_performance_reviews()
 BEGIN
@@ -155,6 +181,7 @@ BEGIN
         de.employee_key,
         dd.department_key,
         NULL AS project_key,        -- projects are linked separately via assignments
+        NULL AS project_key,
         CAST(DATE_FORMAT(CURRENT_DATE, '%Y%m%d') AS UNSIGNED) AS date_key,
         se.PerformanceRating,
         se.JobSatisfaction,
@@ -164,6 +191,7 @@ BEGIN
         se.MonthlyIncome
     FROM hr_oltp.staging_employees se
     JOIN Dim_Employee de ON de.employee_id = se.employee_id AND de.is_current = 1
+    JOIN Dim_Employee de    ON de.employee_id = se.employee_id AND de.is_current = 1
     LEFT JOIN Dim_Department dd ON dd.department_name = se.Department;
 END $$
 

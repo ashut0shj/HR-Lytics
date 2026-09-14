@@ -6,6 +6,9 @@
 -- WINDOW FUNCTIONS (calculations across a set of rows related to the
 -- current row, without collapsing them into one row like GROUP BY does).
 -- =====================================================================
+-- Reference analytics queries demonstrating CTEs and window functions.
+-- These run against the hr_olap data warehouse and are the basis for
+-- the charts and tables in the Streamlit dashboard.
 
 USE hr_olap;
 
@@ -15,6 +18,9 @@ USE hr_olap;
 --    restarts the ranking for every department (the "partition") and
 --    gives tied scores the same rank without skipping numbers.
 -- ---------------------------------------------------------------------
+-- 1. Top performers per department using DENSE_RANK()
+--    DENSE_RANK() restarts numbering for each department partition and
+--    doesn't skip ranks when scores are tied (unlike RANK()).
 WITH ranked_employees AS (
     SELECT
         de.department_name,
@@ -54,6 +60,9 @@ ORDER BY dd.year;
 --    department (NTILE splits each department's employees into 4 equal
 --    buckets) AND whose satisfaction is low, as "higher attrition risk".
 -- ---------------------------------------------------------------------
+-- 3. Attrition risk scoring with CTE + NTILE window function
+--    NTILE(4) divides employees within each department into four equal income
+--    buckets. Bottom-quartile earners with low satisfaction are flagged High Risk.
 WITH income_buckets AS (
     SELECT
         de.employee_id,
@@ -77,6 +86,7 @@ SELECT
     CASE
         WHEN income_quartile = 1 AND job_satisfaction <= 2 THEN 'High Risk'
         WHEN income_quartile = 1 OR job_satisfaction <= 2 THEN 'Medium Risk'
+        WHEN income_quartile = 1 OR  job_satisfaction <= 2 THEN 'Medium Risk'
         ELSE 'Low Risk'
     END AS attrition_risk
 FROM income_buckets
@@ -86,6 +96,7 @@ ORDER BY FIELD(attrition_risk, 'High Risk', 'Medium Risk', 'Low Risk');
 -- ---------------------------------------------------------------------
 -- 4. Department headcount + running total (window function SUM() OVER)
 -- ---------------------------------------------------------------------
+-- 4. Department headcount with running total (SUM() OVER)
 WITH dept_counts AS (
     SELECT department_name, COUNT(*) AS headcount
     FROM Dim_Employee
@@ -103,6 +114,7 @@ ORDER BY headcount DESC;
 -- ---------------------------------------------------------------------
 -- 5. Employees who changed department (uses the SCD2 history directly)
 -- ---------------------------------------------------------------------
+-- 5. Employees who changed department — uses SCD2 history directly
 SELECT
     old.employee_id,
     old.first_name,
@@ -110,9 +122,12 @@ SELECT
     old.department_name AS old_department,
     new.department_name AS new_department,
     old.end_date AS changed_on
+    old.end_date        AS changed_on
 FROM Dim_Employee old
 JOIN Dim_Employee new
     ON new.employee_id = old.employee_id
    AND new.is_current = 1
+    ON  new.employee_id = old.employee_id
+    AND new.is_current  = 1
 WHERE old.is_current = 0
   AND old.department_name <> new.department_name;

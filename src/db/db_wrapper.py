@@ -3,6 +3,14 @@ import mysql.connector
 from dotenv import load_dotenv
 
 load_dotenv()
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env")
+if os.path.exists(env_path):
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, val = line.split("=", 1)
+                os.environ.setdefault(key.strip(), val.strip())
 
 class DBWrapper:
     def __init__(self):
@@ -88,6 +96,15 @@ class DBWrapper:
             if self.conn:
                 self.conn.rollback()
             return False
+
+    def query_df(self, sql, params=None):
+        import pandas as pd
+        try:
+            conn = self.get_connection()
+            return pd.read_sql(sql, conn, params=params)
+        except Exception as e:
+            print("Error fetching dataframe:", e)
+            return pd.DataFrame()
 
     def close(self):
         try:

@@ -2,8 +2,11 @@ venv/
 .env
 __pycache__/
 *.pyc
+*.pyo
 .streamlit/secrets.toml
 *.db
 *.sqlite
 .DS_Store
 
+dataset/staging_*.csv
+dataset/WA_Fn-UseC_-HR-Employee-Attrition.csv

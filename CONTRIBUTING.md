@@ -102,4 +102,3 @@ vY.XX.ZZ-message
 - **Python:** Follow PEP 8 guidelines. Write clear docstrings for classes and methods. Use type hints where appropriate.
 - **SQL:** Standardized SQL keywords in UPPERCASE (`SELECT`, `INSERT`, `CREATE TABLE`). Use prefix `sp_` for stored procedures.
 - **Documentation:** Maintain markdown links and preserve references to `Planning_docs/`.
-

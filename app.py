@@ -1,18 +1,12 @@
-from datetime import date
+import streamlit as st
 import pandas as pd
 import plotly.express as px
-import streamlit as st
-
-from src.managers.managers import (
-    AnalyticsManager,
-    DepartmentManager,
-    EmployeeManager,
-    ProjectManager,
-    ReviewManager,
-)
+from datetime import date
+from src.db.db_wrapper import DBWrapper
+from src.managers.managers import EmployeeManager, DepartmentManager, ProjectManager, ReviewManager, AnalyticsManager, ExplorerManager
 from src.models.models import Employee, Project, Review
 
-st.set_page_config(page_title="Enterprise Employee Analytics", layout="wide")
+st.set_page_config(page_title="HR-Lytics Dashboard", layout="wide")
 
 @st.cache_resource
 def get_managers():
@@ -22,15 +16,16 @@ def get_managers():
         "project": ProjectManager(),
         "review": ReviewManager(),
         "analytics": AnalyticsManager(),
+        "explorer": ExplorerManager(),
     }
 
 managers = get_managers()
 
-st.title("Enterprise Employee Analytics & Data Warehouse")
-
+st.title("HR-Lytics Enterprise Platform")
+st.sidebar.title("Navigation")
 page = st.sidebar.radio(
-    "Navigate",
-    ["Analytics Dashboard", "Onboard Employee", "Projects & Assignments", "Submit Review"],
+    "Go to",
+    ["Analytics Dashboard", "Onboard Employee", "Projects & Assignments", "Submit Review", "Data Explorer"]
 )
 
 if page == "Analytics Dashboard":
@@ -41,11 +36,13 @@ if page == "Analytics Dashboard":
     attrition_df = am.attrition_overview()
 
     total_employees = int(headcount_df["headcount"].sum()) if not headcount_df.empty else 0
-    attrition_yes = attrition_df.loc[attrition_df["attrition"] == "Yes", "employee_count"]
-    attrition_rate = (
-        round(100 * attrition_yes.sum() / total_employees, 1) if total_employees else 0
-    )
-    avg_income = attrition_df["avg_income"].mean() if not attrition_df.empty else 0
+    if not attrition_df.empty and "attrition" in attrition_df.columns:
+        attrition_yes = attrition_df.loc[attrition_df["attrition"] == "Yes", "employee_count"]
+        attrition_rate = round(100 * attrition_yes.sum() / total_employees, 1) if total_employees else 0
+        avg_income = attrition_df["avg_income"].mean()
+    else:
+        attrition_rate = 0
+        avg_income = 0
 
     col1.metric("Total Employees", f"{total_employees:,}")
     col2.metric("Attrition Rate", f"{attrition_rate}%")
@@ -251,3 +248,35 @@ elif page == "Submit Review":
         emp_id_for_history = emp_options[st.selectbox("View history for", list(emp_options.keys()), key="hist_emp")]
         st.dataframe(pd.DataFrame(rm.get_for_employee(emp_id_for_history)), use_container_width=True)
 
+elif page == "Data Explorer":
+    st.subheader("OLTP Database Explorer")
+    st.markdown("Filter operational tables.")
+    
+    ex = managers["explorer"]
+    
+    # List of tables in hr_oltp
+    tables = ["staging_employees", "staging_employee_history", "employees", "departments", "projects", "assignments", "reviews"]
+    table = st.selectbox("Select Table to View", tables)
+    
+    # Fetch columns for the selected table to build dynamic filters
+    columns = ex.get_columns(table)
+    
+    st.write("### Filter Data")
+    c1, c2, c3 = st.columns([2, 1, 3])
+    with c1:
+        filter_col = st.selectbox("Filter Column", ["None"] + columns)
+    with c2:
+        operator = st.selectbox("Operator", ["=", ">", "<", ">=", "<=", "LIKE", "!=:"])
+    with c3:
+        val = st.text_input("Value", placeholder="Enter filter value...")
+        
+    limit = st.slider("Row Limit", min_value=10, max_value=5000, value=100)
+    
+    if st.button("Execute Query"):
+        with st.spinner(f"Querying {table}..."):
+            result_df = ex.filter_table(table, filter_col, operator, val, limit)
+            if not result_df.empty:
+                st.success(f"Returned {len(result_df)} rows")
+                st.dataframe(result_df, use_container_width=True)
+            else:
+                st.warning("No rows match the given filter criteria or table is empty.")

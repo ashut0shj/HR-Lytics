@@ -22,6 +22,8 @@ An enterprise-grade HR analytics platform and data warehouse built with Python, 
 HR-Lytics/
 ├── app.py                      # Main Streamlit application
 ├── requirements.txt            # Python dependencies
+├── Dockerfile                  # Container definition for Streamlit app
+├── docker-compose.yml          # Multi-container orchestration (App + MySQL)
 ├── .env.example                # Sample database configuration
 ├── src/
 │   ├── db/
@@ -46,48 +48,68 @@ HR-Lytics/
 
 ---
 
-## Prerequisites
+## Quickstart with Docker (Recommended)
+
+The easiest way to run HR-Lytics without installing or configuring a local MySQL server is using Docker Compose. It automatically spins up MySQL 8.0, executes the initial database schemas and stored procedures, and starts the Streamlit dashboard.
+
+### 1. Run with Docker Compose
+
+```bash
+docker compose up --build
+```
+
+### 2. Access the Application
+
+Open your browser and navigate to:
+```text
+http://localhost:8501
+```
+
+To stop the containers:
+```bash
+docker compose down
+```
+
+---
+
+## Manual Local Setup
+
+If you prefer to run the application directly on your host machine with an existing MySQL instance:
+
+### 1. Prerequisites
 
 * **Python 3.10+**
 * **MySQL Server 8.0+**
 * **pip / venv**
 
----
-
-## Installation & Setup
-
-### 1. Clone the Repository
-
-```bash
-git clone <repo-url>
-cd HR-Lytics
-```
-
 ### 2. Set Up Virtual Environment
 
 ```bash
-# Create virtual environment
+# Clone repository
+git clone <repo-url>
+cd HR-Lytics
+
+# Create & activate virtual environment
 python -m venv venv
 
-# Activate virtual environment
 # Linux/macOS:
 source venv/bin/activate
 # Windows:
 venv\Scripts\activate
 
-# Install required packages
+# Install dependencies
 pip install -r requirements.txt
 ```
 
 ### 3. Configure Database Credentials
 
-Create a `.env` file in the root directory by copying the example:
+Create `.env` in the root directory:
 
 ```bash
 cp .env.example .env
 ```
 
-Configure the environment variables with your MySQL credentials:
+Set your credentials:
 
 ```ini
 DB_HOST=localhost
@@ -97,11 +119,9 @@ DB_NAME=hr_oltp
 DB_PORT=3306
 ```
 
----
+### 4. Database Initialization
 
-## Database Initialization
-
-Run the following SQL scripts in order using your preferred MySQL client (MySQL CLI or MySQL Workbench):
+Run the initialization scripts in order:
 
 ```bash
 mysql -u root -p < sql/01_oltp_schema.sql
@@ -109,26 +129,28 @@ mysql -u root -p < sql/02_olap_schema.sql
 mysql -u root -p < sql/03_etl_procedures.sql
 ```
 
-* `01_oltp_schema.sql`: Sets up the normalized operational database (`hr_oltp`) and staging tables.
-* `02_olap_schema.sql`: Sets up the star schema data warehouse (`hr_olap`) with dimensions and facts.
-* `03_etl_procedures.sql`: Creates stored procedures for warehouse population and SCD Type 2 handling.
+### 5. Launch Application
+
+```bash
+streamlit run app.py
+```
+
+Access the UI at `http://localhost:8501`.
 
 ---
 
 ## Synthetic Data Generation (Optional)
 
-To scale and populate the warehouse with high-volume synthetic employee data:
+To populate the warehouse with high-volume synthetic employee records:
 
-1. Ensure the IBM HR attrition dataset (`WA_Fn-UseC_-HR-Employee-Attrition.csv`) is present in the `dataset/` directory.
-2. Run the synthesizer:
+1. Place `WA_Fn-UseC_-HR-Employee-Attrition.csv` into `dataset/`.
+2. Generate synthetic records:
 
 ```bash
 python src/synthesizer/generate_data.py
 ```
 
-This generates `dataset/staging_employees.csv` and `dataset/staging_employee_history.csv`.
-
-3. Load the generated staging data into `hr_oltp`, then run the ETL procedures in MySQL:
+3. Load the staging CSVs (`staging_employees.csv` & `staging_employee_history.csv`) into `hr_oltp`, then run the ETL procedures:
 
 ```sql
 USE hr_olap;
@@ -142,25 +164,12 @@ CALL sp_load_fact_performance_reviews();
 
 ---
 
-## Running the Application
-
-Start the Streamlit application:
-
-```bash
-streamlit run app.py
-```
-
-Once running, access the dashboard in your web browser at:
-`http://localhost:8501`
-
----
-
 ## Application Usage
 
-* **Analytics Dashboard**: View real-time organizational KPIs, salary distributions, attrition metrics, and SCD Type 2 historical logs.
-* **Onboard Employee**: Add a new employee into the operational database or update an existing employee's department to trigger an SCD Type 2 audit transition.
-* **Projects & Assignments**: Register new projects and assign employees with defined project roles.
-* **Submit Review**: Record structured performance evaluations and view past review records.
+* **Analytics Dashboard**: Real-time organizational KPIs, compensation distributions, attrition metrics, and SCD Type 2 history logs.
+* **Onboard Employee**: Add new employees or update existing employee departments (triggers an automated SCD Type 2 transition).
+* **Projects & Assignments**: Create projects and allocate staff with roles.
+* **Submit Review**: Record employee performance appraisals across 5 core dimensions.
 
 ---
 
@@ -171,4 +180,5 @@ Once running, access the dashboard in your web browser at:
 * **Database**: MySQL (`mysql-connector-python`)
 * **Data Manipulation**: Pandas, NumPy
 * **Data Synthesis**: Faker
+* **Containerization**: Docker, Docker Compose
 * **Configuration**: python-dotenv

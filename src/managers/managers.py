@@ -188,3 +188,25 @@ class AnalyticsManager(BaseManager):
         except Exception as exc:
             print(f"SCD2 update failed: {exc}")
             return False
+
+class ExplorerManager(BaseManager):
+    """Manager for the dynamic Data Explorer page."""
+    
+    def get_columns(self, table: str) -> list:
+        cols_df = self.db.query_df(f"SHOW COLUMNS FROM {table}")
+        return cols_df["Field"].tolist() if not cols_df.empty else []
+
+    def filter_table(self, table: str, filter_col: str, operator: str, val: str, limit: int):
+        if filter_col != "None" and val != "":
+            if operator == "LIKE":
+                query = f"SELECT * FROM {table} WHERE {filter_col} LIKE %s LIMIT %s"
+                params = (f"%{val}%", int(limit))
+            else:
+                op = "!=" if operator == "!=:" else operator
+                query = f"SELECT * FROM {table} WHERE {filter_col} {op} %s LIMIT %s"
+                params = (val, int(limit))
+        else:
+            query = f"SELECT * FROM {table} LIMIT %s"
+            params = (int(limit),)
+            
+        return self.db.query_df(query, params)

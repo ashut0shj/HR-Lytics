@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: hr_lytics_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: hr_oltp
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/01_oltp_schema.sql:/docker-entrypoint-initdb.d/01_oltp_schema.sql:ro
+      - ./sql/02_olap_schema.sql:/docker-entrypoint-initdb.d/02_olap_schema.sql:ro
+      - ./sql/03_etl_procedures.sql:/docker-entrypoint-initdb.d/03_etl_procedures.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: hr_lytics_app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      DB_NAME: hr_oltp
+      DB_PORT: 3306
+    ports:
+      - "8501:8501"
+
+volumes:
+  mysql_data:
+

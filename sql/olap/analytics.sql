@@ -29,16 +29,24 @@ GROUP BY dd.year
 ORDER BY dd.year;
 
 -- top performers ranked per department using window function
-WITH ranked AS (
+WITH emp_scores AS (
     SELECT
-        de.department_name, de.first_name, de.last_name,
-        f.performance_rating,
-        RANK() OVER (
-            PARTITION BY de.department_name
-            ORDER BY f.performance_rating DESC
-        ) AS perf_rank
+        de.department_name, de.first_name, de.last_name, de.employee_id,
+        AVG(f.performance_rating) AS avg_performance_rating
     FROM hr_olap.Fact_PerformanceReviews f
     JOIN hr_olap.Dim_Employee de ON de.employee_key = f.employee_key
+    WHERE de.is_current = 1
+    GROUP BY de.employee_key, de.department_name, de.first_name, de.last_name, de.employee_id
+),
+ranked AS (
+    SELECT
+        department_name, first_name, last_name, employee_id,
+        avg_performance_rating AS performance_rating,
+        RANK() OVER (
+            PARTITION BY department_name
+            ORDER BY avg_performance_rating DESC
+        ) AS perf_rank
+    FROM emp_scores
 )
 SELECT * FROM ranked WHERE perf_rank <= {top_n}
 ORDER BY department_name, perf_rank;

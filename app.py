@@ -21,7 +21,18 @@ def get_managers():
 
 managers = get_managers()
 
-st.title("HR-Lytics Enterprise Platform")
+title_col, refresh_col = st.columns([5, 1])
+title_col.title("HR-Lytics Enterprise Platform")
+with refresh_col:
+    st.write("")
+    if st.button("🔄 Refresh OLAP", help="Re-run the ETL so new OLTP data (onboarding, department changes, reviews) shows up in the analytics dashboard"):
+        with st.spinner("Syncing OLTP → OLAP..."):
+            ok = managers["analytics"].refresh_olap()
+        if ok:
+            st.success("OLAP refreshed.")
+        else:
+            st.error("Refresh failed — check logs.")
+
 st.sidebar.title("Navigation")
 page = st.sidebar.radio(
     "Go to",
@@ -40,6 +51,9 @@ if page == "Analytics Dashboard":
         attrition_yes = attrition_df.loc[attrition_df["attrition"] == "Yes", "employee_count"]
         attrition_rate = round(100 * attrition_yes.sum() / total_employees, 1) if total_employees else 0
         avg_income = attrition_df["avg_income"].mean()
+        # Weighted average: sum(count * avg_income) / total, not mean of group averages
+        weighted_sum = (attrition_df["employee_count"] * attrition_df["avg_income"]).sum()
+        avg_income = weighted_sum / attrition_df["employee_count"].sum() if attrition_df["employee_count"].sum() > 0 else 0
     else:
         attrition_rate = 0
         avg_income = 0

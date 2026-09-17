@@ -36,6 +36,7 @@ class DBWrapper:
                 database=self.database,
                 port=self.port,
                 use_pure=True,
+                autocommit=True,
             )
         except Exception as e:
             print(f"DB connection error: {e}")
@@ -68,6 +69,20 @@ class DBWrapper:
             print(f"execute_query error: {e}")
             if self.conn:
                 self.conn.rollback()
+            return False
+
+    def call_procedure(self, proc_call: str) -> bool:
+        """Execute a `CALL proc(...)` statement, draining any result sets it leaves behind."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(f"CALL {proc_call}")
+            while cursor.nextset():
+                pass
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"call_procedure error: {e}")
             return False
 
     def execute_many(self, query, data):

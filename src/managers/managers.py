@@ -189,6 +189,18 @@ class AnalyticsManager(BaseManager):
             print(f"SCD2 update failed: {exc}")
             return False
 
+    def refresh_olap(self) -> bool:
+        """Re-run the OLAP procedures so new OLTP data shows up in the dashboard."""
+        ok = True
+        ok &= self.db.call_procedure("hr_olap.sp_load_dim_department()")
+        ok &= self.db.call_procedure("hr_olap.sp_load_dim_project()")
+        ok &= self.db.call_procedure("hr_olap.sp_load_dim_employee_scd2()")
+        ok &= self.db.call_procedure("hr_olap.sp_load_dim_employee_incremental()")
+        ok &= self.db.call_procedure("hr_olap.sp_load_fact_performance_reviews()")
+        ok &= self.db.call_procedure("hr_olap.sp_load_fact_reviews_incremental()")
+        return ok
+
+
 class ExplorerManager(BaseManager):
     """Manager for the dynamic Data Explorer page."""
     

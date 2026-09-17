@@ -130,9 +130,16 @@ DROP PROCEDURE IF EXISTS sp_load_fact_performance_reviews $$
 CREATE PROCEDURE sp_load_fact_performance_reviews()
 BEGIN
     INSERT INTO Fact_PerformanceReviews (
-        employee_key, department_key, project_key, date_key,
-        performance_rating, job_satisfaction, environment_satisfaction,
-        relationship_satisfaction, work_life_balance, monthly_income_at_review
+        employee_key,
+        department_key,
+        project_key,
+        date_key,
+        performance_rating,
+        job_satisfaction,
+        environment_satisfaction,
+        relationship_satisfaction,
+        work_life_balance,
+        monthly_income_at_review
     )
     SELECT
         de.employee_key,
@@ -146,9 +153,13 @@ BEGIN
         se.WorkLifeBalance,
         se.MonthlyIncome
     FROM hr_oltp.staging_employees se
-    JOIN Dim_Employee de    ON de.employee_id = se.employee_id AND de.is_current = 1
-    JOIN Dim_Date dt        ON dt.full_date = se.hire_date
-    LEFT JOIN Dim_Department dd ON dd.department_name = se.Department;
+    JOIN Dim_Employee de
+        ON de.employee_id = se.employee_id
+        AND de.is_current = 1
+    JOIN Dim_Date dt
+        ON dt.full_date = se.hire_date
+    LEFT JOIN Dim_Department dd
+        ON dd.department_name = se.Department;
 END $$
 
 -- new employees added directly to hr_oltp.employees (not via CSV staging)

@@ -263,9 +263,15 @@ def step_run_etl(conn):
     cursor = conn.cursor()
     for name, call in procedures:
         print(f"  CALL {name}...")
-        cursor.execute(f"CALL {call}")
-        while cursor.nextset():
-            pass
+        try:
+            cursor.execute(f"CALL {call}")
+            while cursor.nextset():
+                pass
+            print(f"  ✓ {name}")
+        except Exception as e:
+            print(f"  ✗ {name} FAILED")
+            print(f"  Error: {e}")
+            raise
     conn.commit()
     cursor.close()
 

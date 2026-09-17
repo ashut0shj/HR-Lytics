@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS Dim_Date (
     month      INT,
     month_name VARCHAR(20),
     quarter    INT,
-    year       INT,
+    year       INT
 );
 
 ALTER TABLE Dim_Date ADD UNIQUE INDEX idx_dim_date_full_date (full_date);

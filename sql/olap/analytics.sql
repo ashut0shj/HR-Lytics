@@ -42,9 +42,9 @@ ranked AS (
     SELECT
         department_name, first_name, last_name, employee_id,
         avg_performance_rating AS performance_rating,
-        RANK() OVER (
+        ROW_NUMBER() OVER (
             PARTITION BY department_name
-            ORDER BY avg_performance_rating DESC
+            ORDER BY avg_performance_rating DESC, employee_id ASC
         ) AS perf_rank
     FROM emp_scores
 )
@@ -82,4 +82,3 @@ INSERT INTO hr_olap.Dim_Employee
 VALUES
     (%(emp_id)s, %(fn)s, %(ln)s, %(gender)s, %(age)s, %(dept)s, %(role)s,
      %(level)s, %(income)s, %(attr)s, %(start)s, NULL, 1);
-

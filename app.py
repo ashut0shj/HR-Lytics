@@ -20,20 +20,14 @@ def get_managers():
     }
 
 managers = get_managers()
+
 title_col, refresh_col = st.columns([5, 1])
-
 title_col.title("HR-Lytics Enterprise Platform")
-
 with refresh_col:
     st.write("")
-
-    if st.button(
-        "Refresh OLAP",
-        help="Re-run the ETL so new OLTP data (onboarding, department changes, reviews) shows up in the analytics dashboard"
-    ):
+    if st.button("🔄 Refresh OLAP", help="Re-run the ETL so new OLTP data (onboarding, department changes, reviews) shows up in the analytics dashboard"):
         with st.spinner("Syncing OLTP → OLAP..."):
             ok = managers["analytics"].refresh_olap()
-
         if ok:
             st.success("OLAP refreshed.")
         else:

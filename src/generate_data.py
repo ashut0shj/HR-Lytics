@@ -9,9 +9,9 @@ HISTORY_FRACTION = 0.15
 RANDOM_SEED = 42
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_CSV = os.path.join(THIS_DIR, "..", "..", "dataset", "WA_Fn-UseC_-HR-Employee-Attrition.csv")
-OUTPUT_CURRENT_CSV = os.path.join(THIS_DIR, "..", "..", "dataset", "staging_employees.csv")
-OUTPUT_HISTORY_CSV = os.path.join(THIS_DIR, "..", "..", "dataset", "staging_employee_history.csv")
+INPUT_CSV = os.path.join(THIS_DIR, "..", "dataset", "WA_Fn-UseC_-HR-Employee-Attrition.csv")
+OUTPUT_CURRENT_CSV = os.path.join(THIS_DIR, "..", "dataset", "staging_employees.csv")
+OUTPUT_HISTORY_CSV = os.path.join(THIS_DIR, "..", "dataset", "staging_employee_history.csv")
 
 random.seed(RANDOM_SEED)
 fake = Faker()
@@ -35,9 +35,6 @@ def clone_employees(base_df: pd.DataFrame, target_rows: int) -> pd.DataFrame:
 
     big_df.insert(0, "employee_id", range(1, len(big_df) + 1))
 
-    # Generating a name with Faker per row is the slow part at 1M rows.
-    # A pool of a few thousand unique-ish names, sampled per row, gives the
-    # same realistic variety for a fraction of the Faker calls.
     male_pool = [fake.first_name_male() for _ in range(NAME_POOL_SIZE)]
     female_pool = [fake.first_name_female() for _ in range(NAME_POOL_SIZE)]
     last_pool = [fake.last_name() for _ in range(NAME_POOL_SIZE)]
@@ -49,7 +46,6 @@ def clone_employees(base_df: pd.DataFrame, target_rows: int) -> pd.DataFrame:
         for male in is_male
     ]
     last_names = [random.choice(last_pool) for _ in range(n)]
-    # employee_id suffix guarantees a unique email without scanning a growing set
     emails = [
         f"{f}.{l}.{emp_id}@company.com".lower()
         for f, l, emp_id in zip(first_names, last_names, big_df["employee_id"])

@@ -9,36 +9,21 @@ import os
 import sys
 import subprocess
 import pandas as pd
-from dotenv import load_dotenv
+from src.db_wrapper import DBWrapper
 
-load_dotenv()
+CHUNK_SIZE = 5000
 
-DB_HOST     = os.getenv("DB_HOST", "localhost")
-DB_USER     = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-DB_PORT     = int(os.getenv("DB_PORT", 3306))
-
-CHUNK_SIZE  = 5000
-
-SQL_DIR     = os.path.join(os.path.dirname(__file__), "sql")
+SQL_DIR = os.path.join(os.path.dirname(__file__), "sql")
 DATASET_DIR = os.path.join(os.path.dirname(__file__), "dataset")
 
 CURRENT_CSV = os.path.join(DATASET_DIR, "staging_employees.csv")
 HISTORY_CSV = os.path.join(DATASET_DIR, "staging_employee_history.csv")
 
 
-def get_connection(database=None):
-    import mysql.connector
-    kwargs = dict(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        port=DB_PORT,
-        use_pure=True,
-    )
-    if database:
-        kwargs["database"] = database
-    return mysql.connector.connect(**kwargs)
+def get_connection(database=""):
+    """Get a raw connection via DBWrapper (defaulting to no database / server root)."""
+    db = DBWrapper(database=database)
+    return db.get_connection()
 
 
 def run_sql_file(filepath):
@@ -47,7 +32,8 @@ def run_sql_file(filepath):
     with open(filepath, "r") as f:
         sql = f.read()
 
-    conn = get_connection()
+    db = DBWrapper(database="")
+    conn = db.get_connection()
     cursor = conn.cursor()
 
     def exec_stmt(stmt):
@@ -60,14 +46,12 @@ def run_sql_file(filepath):
             if "Duplicate key name" in str(e):
                 return
             cursor.close()
-            conn.close()
+            db.close()
             sys.exit(
                 f"\n  SQL error while running {os.path.basename(filepath)}:\n"
                 f"  {e}\n\n"
                 f"  Failing statement:\n  {stmt[:200]}\n\n"
-                f"  Stopping here so later steps don't run against a half-built database. "
-                f"Check that {DB_USER} has CREATE DATABASE / CREATE TABLE privileges on "
-                f"{DB_HOST}."
+                f"  Stopping here so later steps don't run against a half-built database."
             )
 
     if "DELIMITER $$" in sql or "DELIMITER\t$$" in sql:
@@ -84,12 +68,11 @@ def run_sql_file(filepath):
 
     conn.commit()
     cursor.close()
-    conn.close()
+    db.close()
 
 
 def truncate_tables(conn):
     cursor = conn.cursor()
-    # Disable foreign key checks for clean truncate
     cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
     tables = [
         "hr_oltp.staging_employees",
@@ -120,7 +103,7 @@ def bulk_insert(conn, table, df, chunk_size=CHUNK_SIZE):
     cols = list(df.columns)
     placeholders = ", ".join(["%s"] * len(cols))
     sql = f"INSERT IGNORE INTO {table} ({', '.join(cols)}) VALUES ({placeholders})"
-    
+
     data = [tuple(None if pd.isna(v) else v for v in row) for row in df.itertuples(index=False, name=None)]
     cursor = conn.cursor()
     total = len(data)
@@ -146,7 +129,7 @@ def step_generate_data():
         return
     print("  Running generate_data.py...")
     result = subprocess.run(
-        [sys.executable, "-m", "src.synthesizer.generate_data"],
+        [sys.executable, "-m", "src.generate_data"],
         capture_output=True, text=True
     )
     if result.returncode != 0:
@@ -292,14 +275,15 @@ def step_verify():
     print("=" * 52)
     all_ok = True
     for db_name, table_list in tables.items():
-        conn = get_connection(db_name)
+        db = DBWrapper(database=db_name)
+        conn = db.get_connection()
         for table in table_list:
             count = verify(conn, table)
             status = "✅" if count > 0 else "❌ EMPTY"
             if count == 0:
                 all_ok = False
             print(f"  {status}  {db_name}.{table:<35} {count:>10,} rows")
-        conn.close()
+        db.close()
     print("=" * 52)
     if all_ok:
         print("  All tables populated successfully.")
@@ -323,7 +307,8 @@ if __name__ == "__main__":
     step_init_schemas()
 
     print("\n[3/6] Resetting and loading staging CSVs into hr_oltp...")
-    conn_oltp = get_connection("hr_oltp")
+    db_oltp = DBWrapper(database="hr_oltp")
+    conn_oltp = db_oltp.get_connection()
     truncate_tables(conn_oltp)
     step_load_staging(conn_oltp)
 
@@ -332,12 +317,13 @@ if __name__ == "__main__":
 
     print("\n[5/6] Populating hr_oltp.employees from staging...")
     step_populate_employees(conn_oltp)
-    conn_oltp.close()
+    db_oltp.close()
 
     print("\n[6/6] Running OLAP ETL procedures...")
-    conn_olap = get_connection("hr_olap")
+    db_olap = DBWrapper(database="hr_olap")
+    conn_olap = db_olap.get_connection()
     step_run_etl(conn_olap)
-    conn_olap.close()
+    db_olap.close()
 
     print("\nVerifying row counts...")
     step_verify()

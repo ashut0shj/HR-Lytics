@@ -1,11 +1,122 @@
 # HR-Lytics
 
-HR-Lytics is a small HR analytics platform. It has two databases — one for daily operations (OLTP) and one for reporting/analytics (OLAP) — plus a Streamlit dashboard on top.
+HR-Lytics is an enterprise HR analytics and operational platform built with Python, MySQL, and Streamlit. It implements a dual-database architecture separating daily transactional operations (OLTP) from reporting and analytics (OLAP data warehouse with SCD Type 2 history).
 
-* **OLTP (`hr_oltp`)**: where day-to-day writes happen — onboarding an employee, creating a project, assigning people to it, submitting a review.
-* **OLAP (`hr_olap`)**: a read-only, history-aware copy of the important parts of OLTP, used only for the analytics dashboard. It keeps old versions of an employee's record around (SCD Type 2) so you can see how someone's department/role/salary changed over time.
+* **OLTP (`hr_oltp`)**: Normalized database for day-to-day operations — employee onboarding, department tracking, project assignments, and performance reviews.
+* **OLAP (`hr_olap`)**: Star schema data warehouse with SCD Type 2 dimension tracking and fact tables for analytics dashboards.
 
-Data always flows OLTP → OLAP through the migration/ETL step described below — the app never writes to OLAP directly (except one small SCD2 helper for department changes).
+Data flows from OLTP $\rightarrow$ OLAP via automated ETL stored procedures.
+
+---
+
+## System Architecture
+
+```mermaid
+flowchart TD
+    A["IBM HR Attrition CSV\n~1,470 rows"] --> B["Data Synthesizer\nsrc/generate_data.py\nScales to 100k+ rows using Faker + pandas\nInjects SCD Type 2 history"]
+    B --> C["Staging Tables\nhr_oltp.staging_employees\nhr_oltp.staging_employee_history"]
+    C --> D["OLTP Database — hr_oltp\nemployees · departments\nprojects · assignments · reviews\nNormalized, write-optimized"]
+    D --> E["ETL Stored Procedures\nsql/03_etl_procedures.sql\nsp_load_dim_employee_scd2\nsp_load_fact_performance_reviews"]
+    E --> F["OLAP Data Warehouse — hr_olap\nDim_Employee (SCD2) · Dim_Department\nDim_Project · Dim_Date\nFact_PerformanceReviews"]
+    D --> G["Python DAL\nsrc/db_wrapper.py · src/models.py · src/managers.py"]
+    F --> G
+    G --> H["Streamlit App — app.py\nAnalytics Dashboard · Onboard Employee\nProjects & Assignments · Submit Review · Data Explorer"]
+```
+
+---
+
+## Data Models
+
+### OLTP Entity-Relationship Diagram (`hr_oltp`)
+
+```mermaid
+erDiagram
+    departments ||--o{ employees : "has"
+    departments ||--o{ projects : "owns"
+    employees ||--o{ assignments : "assigned via"
+    projects ||--o{ assignments : "includes"
+    employees ||--o{ reviews : "receives"
+
+    departments {
+        int department_id PK
+        varchar department_name
+    }
+
+    employees {
+        int employee_id PK
+        varchar first_name
+        varchar last_name
+        varchar email
+        varchar gender
+        int age
+        int department_id FK
+        varchar job_role
+        int job_level
+        decimal monthly_income
+        date hire_date
+        varchar attrition
+    }
+
+    projects {
+        int project_id PK
+        varchar project_name
+        int department_id FK
+        date start_date
+        date end_date
+    }
+
+    assignments {
+        int assignment_id PK
+        int employee_id FK
+        int project_id FK
+        varchar role_on_project
+        date assigned_date
+    }
+
+    reviews {
+        int review_id PK
+        int employee_id FK
+        date review_date
+        int performance_rating
+        int job_satisfaction
+        int environment_satisfaction
+        int relationship_satisfaction
+        int work_life_balance
+    }
+```
+
+### OLAP Star Schema (`hr_olap`)
+
+```mermaid
+flowchart TD
+    subgraph Dimensions
+        D1["Dim_Employee\n(SCD Type 2)\nemployee_key (PK)\nemployee_id\ndepartment_name\njob_role\nmonthly_income\nstart_date / end_date\nis_current"]
+        D2["Dim_Department\ndepartment_key (PK)\ndepartment_id\ndepartment_name"]
+        D3["Dim_Project\nproject_key (PK)\nproject_id\nproject_name"]
+        D4["Dim_Date\ndate_key (PK)\nfull_date\nyear / month / quarter"]
+    end
+
+    subgraph Facts
+        F1["Fact_PerformanceReviews\nreview_key (PK)\nemployee_key (FK)\ndepartment_key (FK)\nproject_key (FK)\ndate_key (FK)\nperformance_rating\njob_satisfaction\nenvironment_satisfaction\nwork_life_balance"]
+    end
+
+    D1 --> F1
+    D2 --> F1
+    D3 --> F1
+    D4 --> F1
+```
+
+---
+
+## Slowly Changing Dimension (SCD Type 2) Flow
+
+When an employee changes departments or roles, the existing record is closed with an `end_date` and `is_current = 0`, while a new record is created with `is_current = 1`:
+
+```mermaid
+flowchart LR
+    A["Employee Department Change\n(e.g., Sales → R&D)"] --> B["Close Current Record\nis_current = 0\nend_date = today"]
+    B --> C["Insert New Record\nis_current = 1\nstart_date = today\nend_date = NULL\nnew department_name"]
+```
 
 ---
 
@@ -13,36 +124,32 @@ Data always flows OLTP → OLAP through the migration/ETL step described below �
 
 ```text
 HR-Lytics/
-├── migrate.py                  # Run this to set up / refresh both databases
-├── app.py                      # Streamlit app (dashboard + data entry)
-├── requirements.txt
-├── .env.example                # Copy this to .env and fill in your DB details
+├── migrate.py                  # One-shot migration & ETL runner (uses DBWrapper)
+├── app.py                      # Streamlit interactive application
+├── requirements.txt            # Python dependencies
+├── .env.example                # Template for database configuration
 ├── src/
-│   ├── db/
-│   │   ├── db_wrapper.py       # Handles the MySQL connection
-│   │   └── query_loader.py     # Loads named SQL snippets from the sql/ files
-│   ├── managers/
-│   │   └── managers.py         # All the business logic (create employee, run ETL, etc.)
-│   ├── models/
-│   │   └── models.py           # Employee / Project / Review data classes
-│   └── synthesizer/
-│       └── generate_data.py    # Turns the small sample CSV into ~1,000,000 rows
+│   ├── db_wrapper.py           # MySQL connection management & pooling
+│   ├── generate_data.py        # Synthetic dataset generation with SCD2 history
+│   ├── managers.py             # Data access layer & business logic
+│   ├── models.py               # Dataclass entities (Employee, Project, Review)
+│   └── query_loader.py         # Dynamic SQL query loader from sql/ files
 ├── sql/
-│   ├── 01_oltp_schema.sql      # Creates hr_oltp tables
-│   ├── 02_olap_schema.sql      # Creates hr_olap tables
-│   ├── 03_etl_procedures.sql   # Stored procedures that move data OLTP → OLAP
-│   ├── 04_analytics_queries.sql
-│   ├── oltp/                   # SQL used by the OLTP managers
-│   └── olap/                   # SQL used by the analytics dashboard
-├── diagrams/                   # Architecture & schema diagrams
-└── dataset/                    # Source CSV + generated data (not committed)
+│   ├── 01_oltp_schema.sql      # DDL for hr_oltp tables
+│   ├── 02_olap_schema.sql      # DDL for hr_olap star schema
+│   ├── 03_etl_procedures.sql   # Stored procedures for ETL pipeline
+│   ├── 04_analytics_queries.sql# Standalone analytics SQL queries
+│   ├── oltp/                   # Modular OLTP CRUD SQL statements
+│   └── olap/                   # Modular OLAP analytics SQL statements
+├── diagrams/                   # Raw architecture & schema markdown diagrams
+└── dataset/                    # Source IBM HR CSV & staging files
 ```
 
 ---
 
-## Setup
+## Setup & Installation
 
-**Prerequisites:** Python 3.10+, a MySQL server (this project was built and deployed against Aiven's managed MySQL), pip.
+**Prerequisites:** Python 3.10+, MySQL server (e.g., local MySQL or cloud instance like Aiven).
 
 ```bash
 git clone <repo-url>
@@ -52,7 +159,7 @@ source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` and fill in your database details:
+Copy `.env.example` to `.env` and fill in your connection details:
 
 ```bash
 cp .env.example .env
@@ -68,57 +175,29 @@ DB_PORT=3306
 
 ---
 
-## Running it the first time
+## Running Migration & Launching the App
 
-Everything is driven by one script, `migrate.py`, run from the project root:
+### 1. Run Migration (First-time Setup)
+Run `migrate.py` to generate synthetic data, create schemas, load staging tables, and execute the initial OLAP ETL:
 
 ```bash
 python migrate.py
 ```
 
-This does the following, in order, every time you run it:
-
-1. **Generate data** — if `dataset/staging_employees.csv` doesn't exist yet, it runs `src/synthesizer/generate_data.py`, which takes the small sample CSV (`WA_Fn-UseC_-HR-Employee-Attrition.csv`) and scales it up to about 1,000,000 realistic employee rows, with some of them given a fake history (an old department/role/salary) so SCD2 has something to show.
-2. **Build the schemas** — runs `sql/01_oltp_schema.sql`, `sql/02_olap_schema.sql`, then `sql/03_etl_procedures.sql`, so both `hr_oltp` and `hr_olap` get created (or updated) and all the stored procedures are (re)installed.
-3. **Load OLTP** — loads the generated CSVs into the staging tables, then fills `departments` and `employees` from staging.
-4. **Run the ETL into OLAP** — calls the stored procedures in this order:
-   - `sp_load_dim_date`
-   - `sp_load_dim_department`
-   - `sp_load_dim_project`
-   - `sp_load_dim_employee_scd2`
-   - `sp_load_dim_employee_incremental`
-   - `sp_load_fact_performance_reviews`
-   - `sp_load_fact_reviews_incremental`
-5. **Verify** — prints a row count for every important table in both databases so you can see at a glance that nothing came out empty.
-
-Once it finishes, start the app:
-
+### 2. Start the Streamlit App
 ```bash
 streamlit run app.py
 ```
 
-## Running it again later (keeping it up to date)
-
-You don't need to re-run `migrate.py` for everyday use — it's meant for first-time setup or a full rebuild. Once the app is running, any employee you onboard, department change you make, or review you submit goes straight into `hr_oltp`. To get those changes reflected in the analytics dashboard, use the **"Refresh OLAP"** button at the top of the app. It re-runs the OLAP procedures listed above (minus the one-time dimension loads), so newly onboarded employees and newly submitted reviews show up in the dashboard without needing a full migration.
-
-If you want to rebuild everything from scratch (fresh synthetic data, clean tables), delete the two CSVs in `dataset/` and run `python migrate.py` again.
+The application will open in your browser at `http://localhost:8501`.
 
 ---
 
-## Using the App
+## Key App Features
 
-* **Analytics Dashboard** — headcount by department, attrition rate, salary by role, performance trends, top performers, and SCD2 history — all read from `hr_olap`.
-* **Onboard Employee** — add a new employee, or move an existing one to a different department (this triggers an SCD2 change immediately, no refresh needed).
-* **Projects & Assignments** — create a project and assign employees to it.
-* **Submit Review** — record a performance review for an employee. Needs an OLAP refresh to show up on the dashboard.
-* **Data Explorer** — browse and filter any OLTP table directly.
-
----
-
-## Tech Stack
-
-* **Frontend**: Streamlit, Plotly
-* **Backend**: Python
-* **Database**: MySQL (`mysql-connector-python`), hosted on Aiven
-* **Data**: Pandas, Faker
-* **Config**: python-dotenv
+* **Analytics Dashboard**: Real-time metrics, department headcount, attrition analysis, salary distribution, YoY trends, top performers (window functions), and SCD Type 2 audit history.
+* **Onboard Employee**: Add new employees into `hr_oltp` and manage department transfers.
+* **Projects & Assignments**: Manage company projects and assign staff.
+* **Submit Review**: Record satisfaction & performance review ratings.
+* **Data Explorer**: Live interactive query & filter tool for operational tables.
+* **Refresh OLAP Button**: Syncs operational changes from OLTP to the OLAP data warehouse on demand.

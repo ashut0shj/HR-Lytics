@@ -1,7 +1,7 @@
 from datetime import date
-from src.db.db_wrapper import DBWrapper
-from src.db.query_loader import load_named
-from src.models.models import Employee, Project, Review
+from src.db_wrapper import DBWrapper
+from src.query_loader import load_named
+from src.models import Employee, Project, Review
 
 
 class BaseManager:
@@ -190,7 +190,6 @@ class AnalyticsManager(BaseManager):
             return False
 
     def refresh_olap(self) -> bool:
-        """Re-run the OLAP procedures so new OLTP data shows up in the dashboard."""
         ok = True
         ok &= self.db.call_procedure("hr_olap.sp_load_dim_department()")
         ok &= self.db.call_procedure("hr_olap.sp_load_dim_project()")
@@ -202,8 +201,6 @@ class AnalyticsManager(BaseManager):
 
 
 class ExplorerManager(BaseManager):
-    """Manager for the dynamic Data Explorer page."""
-    
     def get_columns(self, table: str) -> list:
         cols_df = self.db.query_df(f"SHOW COLUMNS FROM {table}")
         return cols_df["Field"].tolist() if not cols_df.empty else []
@@ -220,5 +217,6 @@ class ExplorerManager(BaseManager):
         else:
             query = f"SELECT * FROM {table} LIMIT %s"
             params = (int(limit),)
-            
+
         return self.db.query_df(query, params)
+

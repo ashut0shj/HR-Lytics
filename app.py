@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import date
-from src.db.db_wrapper import DBWrapper
-from src.managers.managers import EmployeeManager, DepartmentManager, ProjectManager, ReviewManager, AnalyticsManager, ExplorerManager
-from src.models.models import Employee, Project, Review
+from src.db_wrapper import DBWrapper
+from src.managers import EmployeeManager, DepartmentManager, ProjectManager, ReviewManager, AnalyticsManager, ExplorerManager
+from src.models import Employee, Project, Review
 
 st.set_page_config(page_title="HR-Lytics Dashboard", layout="wide")
 
@@ -25,7 +25,7 @@ title_col, refresh_col = st.columns([5, 1])
 title_col.title("HR-Lytics Enterprise Platform")
 with refresh_col:
     st.write("")
-    if st.button("🔄 Refresh OLAP", help="Re-run the ETL so new OLTP data (onboarding, department changes, reviews) shows up in the analytics dashboard"):
+    if st.button("Refresh OLAP", help="Re-run the ETL so new OLTP data (onboarding, department changes, reviews) shows up in the analytics dashboard"):
         with st.spinner("Syncing OLTP → OLAP..."):
             ok = managers["analytics"].refresh_olap()
         if ok:

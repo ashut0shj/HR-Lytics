@@ -6,11 +6,13 @@ This diagram shows the end-to-end data journey — from the raw IBM HR CSV all t
 flowchart TD
     A["IBM HR Attrition CSV\n~1,470 rows"]
     B["Data Synthesizer\nsrc/synthesizer/generate_data.py\nScales to 100k+ rows using Faker + pandas\nInjects SCD Type 2 history"]
+    B["Data Synthesizer\nsrc/generate_data.py\nScales to 100k+ rows using Faker + pandas\nInjects SCD Type 2 history"]
     C["Staging Tables\nhr_oltp.staging_employees\nhr_oltp.staging_employee_history"]
     D["OLTP Database — hr_oltp\nemployees · departments\nprojects · assignments · reviews\nNormalized, write-optimized"]
     E["ETL Stored Procedures\nsql/03_etl_procedures.sql\nsp_load_dim_employee_scd2\nsp_load_fact_performance_reviews"]
     F["OLAP Data Warehouse — hr_olap\nDim_Employee (SCD2) · Dim_Department\nDim_Project · Dim_Date\nFact_PerformanceReviews"]
     G["Python DAL\nsrc/db/ · src/models/ · src/managers/\nmysql-connector + python-dotenv"]
+    G["Python DAL\nsrc/db_wrapper.py · src/models.py · src/managers.py\nmysql-connector + python-dotenv"]
     H["Streamlit App — app.py\nOnboard Employee · Projects & Assignments\nSubmit Review · Analytics Dashboard"]
 
     A --> B

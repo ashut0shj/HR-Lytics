@@ -2,9 +2,8 @@ import os
 import mysql.connector
 from dotenv import load_dotenv
 
-# Load .env from the project root. python-dotenv handles the path resolution
-# and will silently do nothing if the file doesn't exist.
 load_dotenv()
+
 
 class DBWrapper:
     """
@@ -14,29 +13,31 @@ class DBWrapper:
     about whether the connection is still alive after an idle period.
     """
 
-    def __init__(self):
+    def __init__(self, database=None):
         self.host = os.getenv("DB_HOST", "localhost")
         self.user = os.getenv("DB_USER", "root")
         self.password = os.getenv("DB_PASSWORD", "")
-        self.database = os.getenv("DB_NAME", "")
         self.port = int(os.getenv("DB_PORT", 3306))
+        if database is not None:
+            self.database = database
+        else:
+            self.database = os.getenv("DB_NAME", "")
         self.conn = None
         self.connect()
 
-    # ------------------------------------------------------------------
-    # Connection management
-    # ------------------------------------------------------------------
-
     def connect(self):
         try:
-            self.conn = mysql.connector.connect(
-                host=self.host,
-                user=self.user,
-                password=self.password,
-                database=self.database,
-                port=self.port,
-                use_pure=True,
-            )
+            kwargs = {
+                "host": self.host,
+                "user": self.user,
+                "password": self.password,
+                "port": self.port,
+                "use_pure": True,
+                "autocommit": True,
+            }
+            if self.database:
+                kwargs["database"] = self.database
+            self.conn = mysql.connector.connect(**kwargs)
         except Exception as e:
             print(f"DB connection error: {e}")
             self.conn = None
@@ -51,10 +52,6 @@ class DBWrapper:
             self.connect()
         return self.conn
 
-    # ------------------------------------------------------------------
-    # Write operations
-    # ------------------------------------------------------------------
-
     def execute_query(self, query, params=None):
         """Run a single DML statement (INSERT / UPDATE / DELETE). Returns True on success."""
         try:
@@ -68,6 +65,20 @@ class DBWrapper:
             print(f"execute_query error: {e}")
             if self.conn:
                 self.conn.rollback()
+            return False
+
+    def call_procedure(self, proc_call: str) -> bool:
+        """Execute a `CALL proc(...)` statement, draining any result sets it leaves behind."""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(f"CALL {proc_call}")
+            while cursor.nextset():
+                pass
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"call_procedure error: {e}")
             return False
 
     def execute_many(self, query, data):
@@ -85,10 +96,6 @@ class DBWrapper:
                 self.conn.rollback()
             return False
 
-    # ------------------------------------------------------------------
-    # Read operations
-    # ------------------------------------------------------------------
-
     def fetch_all(self, query, params=None):
         """Return a list of dicts for a SELECT query. Empty list on error."""
         try:
@@ -103,7 +110,6 @@ class DBWrapper:
             return []
 
     def fetch_one(self, query, params=None):
-        """Return the first row as a dict, or None on error / no results."""
         try:
             conn = self.get_connection()
             cursor = conn.cursor(dictionary=True, buffered=True)
@@ -116,7 +122,6 @@ class DBWrapper:
             return None
 
     def query_df(self, sql, params=None):
-        """Run a SELECT and return the results as a pandas DataFrame."""
         import pandas as pd
         try:
             conn = self.get_connection()
@@ -125,10 +130,6 @@ class DBWrapper:
             print(f"query_df error: {e}")
             return pd.DataFrame()
 
-    # ------------------------------------------------------------------
-    # Cleanup
-    # ------------------------------------------------------------------
-
     def close(self):
         try:
             if self.conn and self.conn.is_connected():
@@ -136,3 +137,4 @@ class DBWrapper:
                 self.conn = None
         except Exception as e:
             print(f"close error: {e}")
+

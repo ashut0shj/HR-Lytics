@@ -55,3 +55,4 @@ class Review:
             self.work_life_balance,
         ]
         return round(sum(scores) / len(scores), 2)
+

@@ -1,6 +1,6 @@
 import os
 
-SQL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "sql")
+SQL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sql")
 
 def load(relative_path):
     full_path = os.path.join(SQL_DIR, relative_path)

@@ -1,18 +1,122 @@
 # HR-Lytics
 
-An enterprise-grade HR analytics platform and data warehouse built with Python, MySQL, and Streamlit. It combines an operational (OLTP) database for managing employees, projects, and performance evaluations with an analytical (OLAP) star schema supporting Slowly Changing Dimensions (SCD Type 2) and SQL window functions.
+HR-Lytics is an enterprise HR analytics and operational platform built with Python, MySQL, and Streamlit. It implements a dual-database architecture separating daily transactional operations (OLTP) from reporting and analytics (OLAP data warehouse with SCD Type 2 history).
+
+* **OLTP (`hr_oltp`)**: Normalized database for day-to-day operations — employee onboarding, department tracking, project assignments, and performance reviews.
+* **OLAP (`hr_olap`)**: Star schema data warehouse with SCD Type 2 dimension tracking and fact tables for analytics dashboards.
+
+Data flows from OLTP $\rightarrow$ OLAP via automated ETL stored procedures.
 
 ---
 
-## Features & Capabilities
+## System Architecture
 
-* **Interactive Analytics Dashboard**: Headcount metrics, attrition rates, compensation by role, longitudinal performance trends, and top performers per department.
-* **SCD Type 2 Career Tracking**: Tracks employee transitions (department transfers, title changes) across time while maintaining complete historical integrity.
-* **Operational Workflows**:
-  * **Employee Onboarding**: Register new staff, assign departments, and configure compensation profiles.
-  * **Projects & Staffing**: Create projects and allocate team members with defined responsibilities.
-  * **Performance Reviews**: Record multi-metric employee appraisals (performance, job satisfaction, work-life balance).
-* **Synthetic Data Generator**: Scales source employee records to 100,000+ realistic profiles using Faker for volume testing.
+```mermaid
+flowchart TD
+    A["IBM HR Attrition CSV\n~1,470 rows"] --> B["Data Synthesizer\nsrc/generate_data.py\nScales to 100k+ rows using Faker + pandas\nInjects SCD Type 2 history"]
+    B --> C["Staging Tables\nhr_oltp.staging_employees\nhr_oltp.staging_employee_history"]
+    C --> D["OLTP Database — hr_oltp\nemployees · departments\nprojects · assignments · reviews\nNormalized, write-optimized"]
+    D --> E["ETL Stored Procedures\nsql/03_etl_procedures.sql\nsp_load_dim_employee_scd2\nsp_load_fact_performance_reviews"]
+    E --> F["OLAP Data Warehouse — hr_olap\nDim_Employee (SCD2) · Dim_Department\nDim_Project · Dim_Date\nFact_PerformanceReviews"]
+    D --> G["Python DAL\nsrc/db_wrapper.py · src/models.py · src/managers.py"]
+    F --> G
+    G --> H["Streamlit App — app.py\nAnalytics Dashboard · Onboard Employee\nProjects & Assignments · Submit Review · Data Explorer"]
+```
+
+---
+
+## Data Models
+
+### OLTP Entity-Relationship Diagram (`hr_oltp`)
+
+```mermaid
+erDiagram
+    departments ||--o{ employees : "has"
+    departments ||--o{ projects : "owns"
+    employees ||--o{ assignments : "assigned via"
+    projects ||--o{ assignments : "includes"
+    employees ||--o{ reviews : "receives"
+
+    departments {
+        int department_id PK
+        varchar department_name
+    }
+
+    employees {
+        int employee_id PK
+        varchar first_name
+        varchar last_name
+        varchar email
+        varchar gender
+        int age
+        int department_id FK
+        varchar job_role
+        int job_level
+        decimal monthly_income
+        date hire_date
+        varchar attrition
+    }
+
+    projects {
+        int project_id PK
+        varchar project_name
+        int department_id FK
+        date start_date
+        date end_date
+    }
+
+    assignments {
+        int assignment_id PK
+        int employee_id FK
+        int project_id FK
+        varchar role_on_project
+        date assigned_date
+    }
+
+    reviews {
+        int review_id PK
+        int employee_id FK
+        date review_date
+        int performance_rating
+        int job_satisfaction
+        int environment_satisfaction
+        int relationship_satisfaction
+        int work_life_balance
+    }
+```
+
+### OLAP Star Schema (`hr_olap`)
+
+```mermaid
+flowchart TD
+    subgraph Dimensions
+        D1["Dim_Employee\n(SCD Type 2)\nemployee_key (PK)\nemployee_id\ndepartment_name\njob_role\nmonthly_income\nstart_date / end_date\nis_current"]
+        D2["Dim_Department\ndepartment_key (PK)\ndepartment_id\ndepartment_name"]
+        D3["Dim_Project\nproject_key (PK)\nproject_id\nproject_name"]
+        D4["Dim_Date\ndate_key (PK)\nfull_date\nyear / month / quarter"]
+    end
+
+    subgraph Facts
+        F1["Fact_PerformanceReviews\nreview_key (PK)\nemployee_key (FK)\ndepartment_key (FK)\nproject_key (FK)\ndate_key (FK)\nperformance_rating\njob_satisfaction\nenvironment_satisfaction\nwork_life_balance"]
+    end
+
+    D1 --> F1
+    D2 --> F1
+    D3 --> F1
+    D4 --> F1
+```
+
+---
+
+## Slowly Changing Dimension (SCD Type 2) Flow
+
+When an employee changes departments or roles, the existing record is closed with an `end_date` and `is_current = 0`, while a new record is created with `is_current = 1`:
+
+```mermaid
+flowchart LR
+    A["Employee Department Change\n(e.g., Sales → R&D)"] --> B["Close Current Record\nis_current = 0\nend_date = today"]
+    B --> C["Insert New Record\nis_current = 1\nstart_date = today\nend_date = NULL\nnew department_name"]
+```
 
 ---
 
@@ -20,165 +124,80 @@ An enterprise-grade HR analytics platform and data warehouse built with Python, 
 
 ```text
 HR-Lytics/
-├── app.py                      # Main Streamlit application
+├── migrate.py                  # One-shot migration & ETL runner (uses DBWrapper)
+├── app.py                      # Streamlit interactive application
 ├── requirements.txt            # Python dependencies
-├── Dockerfile                  # Container definition for Streamlit app
-├── docker-compose.yml          # Multi-container orchestration (App + MySQL)
-├── .env.example                # Sample database configuration
+├── .env.example                # Template for database configuration
 ├── src/
-│   ├── db/
-│   │   ├── db_wrapper.py       # Database connection & transaction handler
-│   │   └── query_loader.py     # SQL query management utility
-│   ├── managers/
-│   │   └── managers.py         # Business logic & Data Access Layer (DAL)
-│   ├── models/
-│   │   └── models.py           # Data models (Employee, Project, Review)
-│   └── synthesizer/
-│       └── generate_data.py    # Synthetic data generation script
+│   ├── db_wrapper.py           # MySQL connection management & pooling
+│   ├── generate_data.py        # Synthetic dataset generation with SCD2 history
+│   ├── managers.py             # Data access layer & business logic
+│   ├── models.py               # Dataclass entities (Employee, Project, Review)
+│   └── query_loader.py         # Dynamic SQL query loader from sql/ files
 ├── sql/
-│   ├── 01_oltp_schema.sql      # Operational schema setup (hr_oltp)
-│   ├── 02_olap_schema.sql      # Analytical star schema setup (hr_olap)
-│   ├── 03_etl_procedures.sql   # Warehouse loading & SCD Type 2 procedures
-│   ├── 04_analytics_queries.sql # Window functions and analytical queries
-│   ├── oltp/                   # Parameterized operational queries
-│   └── olap/                   # Parameterized reporting queries
-├── diagrams/                   # Architecture & schema design references
-└── dataset/                    # Raw and generated datasets
+│   ├── 01_oltp_schema.sql      # DDL for hr_oltp tables
+│   ├── 02_olap_schema.sql      # DDL for hr_olap star schema
+│   ├── 03_etl_procedures.sql   # Stored procedures for ETL pipeline
+│   ├── 04_analytics_queries.sql# Standalone analytics SQL queries
+│   ├── oltp/                   # Modular OLTP CRUD SQL statements
+│   └── olap/                   # Modular OLAP analytics SQL statements
+├── diagrams/                   # Raw architecture & schema markdown diagrams
+└── dataset/                    # Source IBM HR CSV & staging files
 ```
 
 ---
 
-## Quickstart with Docker (Recommended)
+## Setup & Installation
 
-The easiest way to run HR-Lytics without installing or configuring a local MySQL server is using Docker Compose. It automatically spins up MySQL 8.0, executes the initial database schemas and stored procedures, and starts the Streamlit dashboard.
-
-### 1. Run with Docker Compose
+**Prerequisites:** Python 3.10+, MySQL server (e.g., local MySQL or cloud instance like Aiven).
 
 ```bash
-docker compose up --build
-```
-
-### 2. Access the Application
-
-Open your browser and navigate to:
-```text
-http://localhost:8501
-```
-
-To stop the containers:
-```bash
-docker compose down
-```
-
----
-
-## Manual Local Setup
-
-If you prefer to run the application directly on your host machine with an existing MySQL instance:
-
-### 1. Prerequisites
-
-* **Python 3.10+**
-* **MySQL Server 8.0+**
-* **pip / venv**
-
-### 2. Set Up Virtual Environment
-
-```bash
-# Clone repository
 git clone <repo-url>
 cd HR-Lytics
-
-# Create & activate virtual environment
 python -m venv venv
-
-# Linux/macOS:
-source venv/bin/activate
-# Windows:
-venv\Scripts\activate
-
-# Install dependencies
+source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. Configure Database Credentials
-
-Create `.env` in the root directory:
+Copy `.env.example` to `.env` and fill in your connection details:
 
 ```bash
 cp .env.example .env
 ```
 
-Set your credentials:
-
 ```ini
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_mysql_password
+DB_HOST=your-mysql-host
+DB_USER=your-user
+DB_PASSWORD=your-password
 DB_NAME=hr_oltp
 DB_PORT=3306
 ```
 
-### 4. Database Initialization
+---
 
-Run the initialization scripts in order:
+## Running Migration & Launching the App
+
+### 1. Run Migration (First-time Setup)
+Run `migrate.py` to generate synthetic data, create schemas, load staging tables, and execute the initial OLAP ETL:
 
 ```bash
-mysql -u root -p < sql/01_oltp_schema.sql
-mysql -u root -p < sql/02_olap_schema.sql
-mysql -u root -p < sql/03_etl_procedures.sql
+python migrate.py
 ```
 
-### 5. Launch Application
-
+### 2. Start the Streamlit App
 ```bash
 streamlit run app.py
 ```
 
-Access the UI at `http://localhost:8501`.
+The application will open in your browser at `http://localhost:8501`.
 
 ---
 
-## Synthetic Data Generation (Optional)
+## Key App Features
 
-To populate the warehouse with high-volume synthetic employee records:
-
-1. Place `WA_Fn-UseC_-HR-Employee-Attrition.csv` into `dataset/`.
-2. Generate synthetic records:
-
-```bash
-python src/synthesizer/generate_data.py
-```
-
-3. Load the staging CSVs (`staging_employees.csv` & `staging_employee_history.csv`) into `hr_oltp`, then run the ETL procedures:
-
-```sql
-USE hr_olap;
-
-CALL sp_load_dim_date('2015-01-01', '2027-12-31');
-CALL sp_load_dim_department();
-CALL sp_load_dim_project();
-CALL sp_load_dim_employee_scd2();
-CALL sp_load_fact_performance_reviews();
-```
-
----
-
-## Application Usage
-
-* **Analytics Dashboard**: Real-time organizational KPIs, compensation distributions, attrition metrics, and SCD Type 2 history logs.
-* **Onboard Employee**: Add new employees or update existing employee departments (triggers an automated SCD Type 2 transition).
-* **Projects & Assignments**: Create projects and allocate staff with roles.
-* **Submit Review**: Record employee performance appraisals across 5 core dimensions.
-
----
-
-## Tech Stack
-
-* **Frontend / Dashboard**: Streamlit, Plotly Express
-* **Backend**: Python (OOP Data Access Layer)
-* **Database**: MySQL (`mysql-connector-python`)
-* **Data Manipulation**: Pandas, NumPy
-* **Data Synthesis**: Faker
-* **Containerization**: Docker, Docker Compose
-* **Configuration**: python-dotenv
+* **Analytics Dashboard**: Real-time metrics, department headcount, attrition analysis, salary distribution, YoY trends, top performers (window functions), and SCD Type 2 audit history.
+* **Onboard Employee**: Add new employees into `hr_oltp` and manage department transfers.
+* **Projects & Assignments**: Manage company projects and assign staff.
+* **Submit Review**: Record satisfaction & performance review ratings.
+* **Data Explorer**: Live interactive query & filter tool for operational tables.
+* **Refresh OLAP Button**: Syncs operational changes from OLTP to the OLAP data warehouse on demand.

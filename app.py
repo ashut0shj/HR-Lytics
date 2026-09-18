@@ -8,6 +8,20 @@ from src.models import Employee, Project, Review
 
 st.set_page_config(page_title="HR-Lytics Dashboard", layout="wide")
 
+db_health = DBWrapper()
+if not db_health.is_healthy():
+    st.title("HR-Lytics Enterprise Platform")
+    st.error("⚠️ Database connection failed")
+    st.info(
+        "We couldn't connect to the database right now.\n\n"
+        "- **Using Aiven Cloud?** Free or trial tier databases pause automatically when idle. Head over to the [Aiven Console](https://console.aiven.io/), click **Power on**, and wait about a minute.\n"
+        "- **Running locally?** Make sure your local MySQL service is running and credentials in `.env` match."
+    )
+    if st.button("🔄 Retry Connection"):
+        st.cache_resource.clear()
+        st.rerun()
+    st.stop()
+
 @st.cache_resource
 def get_managers():
     return {

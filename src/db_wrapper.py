@@ -52,10 +52,20 @@ class DBWrapper:
             self.connect()
         return self.conn
 
+    def is_healthy(self) -> bool:
+        """Check if database connection is alive and working."""
+        try:
+            conn = self.get_connection()
+            return conn is not None and conn.is_connected()
+        except Exception:
+            return False
+
     def execute_query(self, query, params=None):
         """Run a single DML statement (INSERT / UPDATE / DELETE). Returns True on success."""
         try:
             conn = self.get_connection()
+            if not conn:
+                return False
             cursor = conn.cursor(dictionary=True, buffered=True)
             cursor.execute(query, params or ())
             conn.commit()
@@ -71,6 +81,8 @@ class DBWrapper:
         """Execute a `CALL proc(...)` statement, draining any result sets it leaves behind."""
         try:
             conn = self.get_connection()
+            if not conn:
+                return False
             cursor = conn.cursor()
             cursor.execute(f"CALL {proc_call}")
             while cursor.nextset():
@@ -85,6 +97,8 @@ class DBWrapper:
         """Batch-insert using executemany. Returns True on success."""
         try:
             conn = self.get_connection()
+            if not conn:
+                return False
             cursor = conn.cursor(buffered=True)
             cursor.executemany(query, data)
             conn.commit()
@@ -100,6 +114,8 @@ class DBWrapper:
         """Return a list of dicts for a SELECT query. Empty list on error."""
         try:
             conn = self.get_connection()
+            if not conn:
+                return []
             cursor = conn.cursor(dictionary=True, buffered=True)
             cursor.execute(query, params or ())
             result = cursor.fetchall()
@@ -112,6 +128,8 @@ class DBWrapper:
     def fetch_one(self, query, params=None):
         try:
             conn = self.get_connection()
+            if not conn:
+                return None
             cursor = conn.cursor(dictionary=True, buffered=True)
             cursor.execute(query, params or ())
             result = cursor.fetchone()
@@ -125,6 +143,8 @@ class DBWrapper:
         import pandas as pd
         try:
             conn = self.get_connection()
+            if not conn:
+                return pd.DataFrame()
             return pd.read_sql(sql, conn, params=params)
         except Exception as e:
             print(f"query_df error: {e}")

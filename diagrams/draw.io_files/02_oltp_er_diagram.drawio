@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram name="OLTP ER Diagram" id="OLTP_ER_Diagram">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n2" value="departments&#10;PK  department_id  int&#10;     department_name  varchar" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="employees&#10;PK  employee_id  int&#10;     first_name  varchar&#10;     last_name  varchar&#10;     email  varchar&#10;     gender  varchar&#10;     age  int&#10;FK  department_id  int&#10;     job_role  varchar&#10;     job_level  int&#10;     monthly_income  decimal&#10;     hire_date  date&#10;     attrition  varchar" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="340" y="40" width="260" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="projects&#10;PK  project_id  int&#10;     project_name  varchar&#10;FK  department_id  int&#10;     start_date  date&#10;     end_date  date" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="700" y="40" width="240" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="assignments&#10;PK  assignment_id  int&#10;FK  employee_id  int&#10;FK  project_id  int&#10;     role_on_project  varchar&#10;     assigned_date  date" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="700" y="260" width="240" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="reviews&#10;PK  review_id  int&#10;FK  employee_id  int&#10;     review_date  date&#10;     performance_rating  int&#10;     job_satisfaction  int&#10;     environment_satisfaction  int&#10;     relationship_satisfaction  int&#10;     work_life_balance  int" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="340" y="340" width="260" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n7" value="staging_employees&#10;     employee_id  int&#10;     first_name  varchar&#10;     last_name  varchar&#10;     email  varchar&#10;     hire_date  date&#10;     scd_start_date  date&#10;     scd_end_date  date&#10;     is_current  tinyint" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="220" width="260" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="n8" value="has (1 -&gt; many)" style="edgeStyle=entityRelationEdgeStyle;rounded=0;html=1;endArrow=ERmany;startArrow=ERone;fontSize=11;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n9" value="owns (1 -&gt; many)" style="edgeStyle=entityRelationEdgeStyle;rounded=0;html=1;endArrow=ERmany;startArrow=ERone;fontSize=11;" edge="1" parent="1" source="n2" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n10" value="assigned via (1 -&gt; many)" style="edgeStyle=entityRelationEdgeStyle;rounded=0;html=1;endArrow=ERmany;startArrow=ERone;fontSize=11;" edge="1" parent="1" source="n3" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n11" value="includes (1 -&gt; many)" style="edgeStyle=entityRelationEdgeStyle;rounded=0;html=1;endArrow=ERmany;startArrow=ERone;fontSize=11;" edge="1" parent="1" source="n4" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n12" value="receives (1 -&gt; many)" style="edgeStyle=entityRelationEdgeStyle;rounded=0;html=1;endArrow=ERmany;startArrow=ERone;fontSize=11;" edge="1" parent="1" source="n3" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

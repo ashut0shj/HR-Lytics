@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram name="OLAP Star Schema" id="OLAP_Star_Schema">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n2" value="Dim_Employee (SCD Type 2)&#10;PK  employee_key  int&#10;     employee_id  int&#10;     first_name  varchar&#10;     last_name  varchar&#10;     gender  varchar&#10;     age  int&#10;     department_name  varchar&#10;     job_role  varchar&#10;     job_level  int&#10;     monthly_income  decimal&#10;     attrition  varchar&#10;     start_date  date&#10;     end_date  date&#10;     is_current  tinyint" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="40" width="260" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="Dim_Department&#10;PK  department_key  int&#10;     department_id  int&#10;     department_name  varchar" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="60" y="320" width="240" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="Fact_PerformanceReviews&#10;PK  review_key  int&#10;FK  employee_key  int&#10;FK  department_key  int&#10;FK  project_key  int&#10;FK  date_key  int&#10;     performance_rating  int&#10;     job_satisfaction  int&#10;     environment_satisfaction  int&#10;     relationship_satisfaction  int&#10;     work_life_balance  int&#10;     monthly_income_at_review  decimal" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;spacing=6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="160" width="280" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" value="Dim_Project&#10;PK  project_key  int&#10;     project_id  int&#10;     project_name  varchar&#10;     department_name  varchar" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="780" y="40" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="Dim_Date&#10;PK  date_key  int&#10;     full_date  date&#10;     day  int&#10;     month  int&#10;     month_name  varchar&#10;     quarter  int&#10;     year  int" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="780" y="320" width="240" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="n7" value="employee_key" style="edgeStyle=entityRelationEdgeStyle;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;fontSize=11;" edge="1" parent="1" source="n2" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n8" value="department_key" style="edgeStyle=entityRelationEdgeStyle;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;fontSize=11;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n9" value="project_key" style="edgeStyle=entityRelationEdgeStyle;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;fontSize=11;" edge="1" parent="1" source="n5" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n10" value="date_key" style="edgeStyle=entityRelationEdgeStyle;rounded=0;html=1;endArrow=ERone;startArrow=ERmany;fontSize=11;" edge="1" parent="1" source="n6" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -152,7 +152,7 @@ HR-Lytics/
 **Prerequisites:** Python 3.10+, MySQL server (e.g., local MySQL or cloud instance like Aiven).
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/ashut0shj/HR-Lytics.git
 cd HR-Lytics
 python -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\activate

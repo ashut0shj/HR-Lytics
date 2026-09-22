@@ -82,3 +82,102 @@ INSERT INTO hr_olap.Dim_Employee
 VALUES
     (%(emp_id)s, %(fn)s, %(ln)s, %(gender)s, %(age)s, %(dept)s, %(role)s,
      %(level)s, %(income)s, %(attr)s, %(start)s, NULL, 1);
+
+-- attrition risk by satisfaction and department benchmarks
+WITH latest_reviews AS (
+    SELECT
+        f.employee_key,
+        f.performance_rating,
+        f.job_satisfaction,
+        f.environment_satisfaction,
+        f.relationship_satisfaction,
+        f.work_life_balance,
+        ROW_NUMBER() OVER (
+            PARTITION BY f.employee_key
+            ORDER BY f.date_key DESC, f.review_key DESC
+        ) AS rn
+    FROM hr_olap.Fact_PerformanceReviews f
+),
+emp_benchmarks AS (
+    SELECT
+        de.employee_id,
+        de.first_name,
+        de.last_name,
+        de.department_name,
+        de.job_role,
+        de.job_level,
+        de.monthly_income,
+        lr.job_satisfaction,
+        lr.work_life_balance,
+        lr.environment_satisfaction,
+        lr.relationship_satisfaction,
+        lr.performance_rating,
+        ROUND(AVG(lr.job_satisfaction) OVER (PARTITION BY de.department_name), 2) AS dept_avg_satisfaction,
+        ROUND(AVG(lr.work_life_balance) OVER (PARTITION BY de.department_name), 2) AS dept_avg_wlb,
+        ROUND(AVG(de.monthly_income) OVER (PARTITION BY de.department_name), 2) AS dept_avg_income,
+        NTILE(4) OVER (PARTITION BY de.department_name ORDER BY de.monthly_income ASC) AS income_quartile
+    FROM hr_olap.Dim_Employee de
+    JOIN latest_reviews lr
+        ON lr.employee_key = de.employee_key
+       AND lr.rn = 1
+    WHERE de.is_current = 1
+      AND de.attrition = 'No'
+),
+risk_scoring AS (
+    SELECT
+        employee_id,
+        first_name,
+        last_name,
+        department_name,
+        job_role,
+        job_level,
+        monthly_income,
+        dept_avg_income,
+        income_quartile,
+        job_satisfaction,
+        dept_avg_satisfaction,
+        work_life_balance,
+        dept_avg_wlb,
+        environment_satisfaction,
+        relationship_satisfaction,
+        performance_rating,
+        (CASE WHEN job_satisfaction < dept_avg_satisfaction THEN 1 ELSE 0 END) AS flag_low_satisfaction,
+        (CASE WHEN monthly_income < dept_avg_income THEN 1 ELSE 0 END) AS flag_low_income,
+        (CASE WHEN work_life_balance < dept_avg_wlb OR work_life_balance <= 2 THEN 1 ELSE 0 END) AS flag_low_wlb,
+        (CASE WHEN environment_satisfaction <= 2 THEN 1 ELSE 0 END) AS flag_low_env,
+        (CASE WHEN relationship_satisfaction <= 2 THEN 1 ELSE 0 END) AS flag_low_rel
+    FROM emp_benchmarks
+),
+risk_weighted AS (
+    SELECT
+        *,
+        (flag_low_satisfaction * 3 +
+         flag_low_income * 2 +
+         flag_low_wlb * 2 +
+         flag_low_env * 1 +
+         flag_low_rel * 1) AS risk_points
+    FROM risk_scoring
+)
+SELECT
+    employee_id,
+    CONCAT(first_name, ' ', last_name) AS employee_name,
+    department_name,
+    job_role,
+    job_level,
+    monthly_income,
+    dept_avg_income,
+    job_satisfaction,
+    dept_avg_satisfaction,
+    work_life_balance,
+    environment_satisfaction,
+    relationship_satisfaction,
+    risk_points,
+    CASE
+        WHEN risk_points >= 6 THEN 'Critical Risk'
+        WHEN risk_points >= 4 THEN 'High Risk'
+        WHEN risk_points >= 2 THEN 'Medium Risk'
+        ELSE 'Low Risk'
+    END AS attrition_risk_tier
+FROM risk_weighted
+ORDER BY risk_points DESC, job_satisfaction ASC;
+

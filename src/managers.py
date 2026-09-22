@@ -147,6 +147,10 @@ class AnalyticsManager(BaseManager):
         sql = load_named("olap/analytics.sql", "attrition breakdown with average income")
         return self.db.query_df(sql)
 
+    def attrition_risk(self):
+        sql = load_named("olap/analytics.sql", "attrition risk by satisfaction and department benchmarks")
+        return self.db.query_df(sql)
+
     def salary_by_job_role(self):
         sql = load_named("olap/analytics.sql", "average salary per job role")
         return self.db.query_df(sql)

@@ -122,6 +122,19 @@ if page == "Analytics Dashboard":
     hist_df = am.scd2_change_history(limit=25)
     st.dataframe(hist_df, use_container_width=True)
 
+    st.divider()
+    st.subheader("Attrition Risk Early Warning")
+    risk_df = am.attrition_risk()
+    if not risk_df.empty:
+        crit_count = int((risk_df["attrition_risk_tier"] == "Critical Risk").sum())
+        high_count = int((risk_df["attrition_risk_tier"] == "High Risk").sum())
+        rcol1, rcol2 = st.columns(2)
+        rcol1.metric("Critical Risk Employees", crit_count)
+        rcol2.metric("High Risk Employees", high_count)
+        st.dataframe(risk_df, use_container_width=True)
+    else:
+        st.info("No review or employee data available for attrition risk calculation.")
+
 
 elif page == "Onboard Employee":
     st.subheader("Onboard a New Employee")

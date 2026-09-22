@@ -1,5 +1,8 @@
 # HR-Lytics
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://v4c-lytic.streamlit.app/)  
+**Live Application:** [https://v4c-lytic.streamlit.app/](https://v4c-lytic.streamlit.app/)
+
 HR-Lytics is an enterprise HR analytics and operational platform built with Python, MySQL, and Streamlit. It implements a dual-database architecture separating daily transactional operations (OLTP) from reporting and analytics (OLAP data warehouse with SCD Type 2 history).
 
 * **OLTP (`hr_oltp`)**: Normalized database for day-to-day operations — employee onboarding, department tracking, project assignments, and performance reviews.

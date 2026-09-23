@@ -22,6 +22,27 @@ erDiagram
         decimal monthly_income
         date hire_date
         varchar attrition
+        int employee_number
+        varchar business_travel
+        int daily_rate
+        int distance_from_home
+        int education
+        varchar education_field
+        int employee_count
+        int hourly_rate
+        varchar marital_status
+        int monthly_rate
+        int num_companies_worked
+        varchar over_18
+        varchar over_time
+        int percent_salary_hike
+        int standard_hours
+        int stock_option_level
+        int total_working_years
+        int years_at_company
+        int years_in_current_role
+        int years_since_last_promotion
+        int years_with_curr_manager
     }
 
     projects {
@@ -67,10 +88,10 @@ erDiagram
     employees ||--o{ assignments : "assigned via"
     projects ||--o{ assignments : "includes"
     employees ||--o{ reviews : "receives"
+    staging_employees ||--o| employees : "loads into"
 ```
 
 **Key design decisions:**
 - `employees` only stores the *current* state. Historical versions live in `Dim_Employee` (OLAP side) via SCD Type 2.
 - `assignments` is the many-to-many bridge between employees and projects.
 - Ratings use a 1–4 integer scale matching the original IBM dataset.
-

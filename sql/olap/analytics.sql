@@ -42,7 +42,7 @@ ranked AS (
     SELECT
         department_name, first_name, last_name, employee_id,
         avg_performance_rating AS performance_rating,
-        ROW_NUMBER() OVER (
+        dense_rank() OVER (
             PARTITION BY department_name
             ORDER BY avg_performance_rating DESC, employee_id ASC
         ) AS perf_rank

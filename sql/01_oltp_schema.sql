@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS departments (
 
 CREATE TABLE IF NOT EXISTS employees (
     employee_id      INT PRIMARY KEY,
-    first_name       VARCHAR(60)     NOT NULL,
-    last_name        VARCHAR(60)     NOT NULL,
+    first_name       VARCHAR(60)     NOT NULL CHECK (first_name REGEXP '^[A-Za-z]+$'),
+    last_name        VARCHAR(60)     NOT NULL CHECK (last_name REGEXP '^[A-Za-z]+$'),
     email             VARCHAR(150)    NOT NULL UNIQUE,
     gender           VARCHAR(10),
     age              INT,

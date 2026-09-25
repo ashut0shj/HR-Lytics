@@ -165,11 +165,15 @@ elif page == "Onboard Employee":
     if submitted:
         if not first_name or not last_name or not email:
             st.error("First name, last name, and email are required.")
+        elif not first_name.replace(" ", "").isalpha() or not last_name.replace(" ", "").isalpha():
+            st.error("Names should contain characters only.")
+        elif not str(age).isdigit():
+            st.error("Age must be a number between 18 and 70.")
         else:
             dept_id = dm.create_if_missing(department)
             new_emp = Employee(
                 first_name=first_name, last_name=last_name, email=email,
-                gender=gender, age=age, department_id=dept_id, job_role=job_role,
+                gender=gender, age=int(age), department_id=dept_id, job_role=job_role,
                 job_level=job_level, monthly_income=monthly_income, hire_date=hire_date,
                 attrition="No", employee_id=em.next_id(),
             )

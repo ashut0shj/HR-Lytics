@@ -59,13 +59,17 @@ CREATE TABLE IF NOT EXISTS Fact_PerformanceReviews (
     work_life_balance         INT,
     monthly_income_at_review  DECIMAL(10, 2),
     CONSTRAINT fk_fact_employee
-        FOREIGN KEY (employee_key) REFERENCES Dim_Employee(employee_key),
+        FOREIGN KEY (employee_key) REFERENCES Dim_Employee(employee_key)
+        ON DELETE CASCADE,
     CONSTRAINT fk_fact_department
-        FOREIGN KEY (department_key) REFERENCES Dim_Department(department_key),
+        FOREIGN KEY (department_key) REFERENCES Dim_Department(department_key)
+        ON DELETE CASCADE,
     CONSTRAINT fk_fact_project
-        FOREIGN KEY (project_key) REFERENCES Dim_Project(project_key),
+        FOREIGN KEY (project_key) REFERENCES Dim_Project(project_key)
+        ON DELETE CASCADE,
     CONSTRAINT fk_fact_date
         FOREIGN KEY (date_key) REFERENCES Dim_Date(date_key)
+        ON DELETE CASCADE
 );
 
 CREATE INDEX idx_fact_employee ON Fact_PerformanceReviews(employee_key);

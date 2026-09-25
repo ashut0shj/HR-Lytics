@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS employees (
     years_with_curr_manager  INT,
     CONSTRAINT fk_employee_department
         FOREIGN KEY (department_id) REFERENCES departments(department_id)
+        ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -52,6 +53,7 @@ CREATE TABLE IF NOT EXISTS projects (
     end_date      DATE,
     CONSTRAINT fk_project_department
         FOREIGN KEY (department_id) REFERENCES departments(department_id)
+        ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS assignments (
@@ -61,9 +63,11 @@ CREATE TABLE IF NOT EXISTS assignments (
     role_on_project VARCHAR(80),
     assigned_date   DATE DEFAULT (CURRENT_DATE),
     CONSTRAINT fk_assignment_employee
-        FOREIGN KEY (employee_id) REFERENCES employees(employee_id),
+        FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
+        ON DELETE CASCADE,
     CONSTRAINT fk_assignment_project
         FOREIGN KEY (project_id) REFERENCES projects(project_id)
+        ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS reviews (
@@ -79,6 +83,7 @@ CREATE TABLE IF NOT EXISTS reviews (
     trainings_last_year      INT,
     CONSTRAINT fk_review_employee
         FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
+        ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS staging_employees (
